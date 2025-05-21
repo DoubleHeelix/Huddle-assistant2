@@ -10,31 +10,24 @@ st.title("🤝 Huddle Assistant")
 tab1, tab2 = st.tabs(["New Huddle Play", "📚 View Past Huddles"])
 
 with tab1:
-uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
+    uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
 
-if uploaded_image:
-    from PIL import Image
-    image = Image.open(uploaded_image)
-    st.image(image, caption="Uploaded Screenshot", use_column_width=True)
+    if uploaded_image:
+        from PIL import Image
+        image = Image.open(uploaded_image)
+        st.image(image, caption="Uploaded Screenshot", use_column_width=True)
 
-user_draft = st.text_area("✍️ Your Draft Message")
+    user_draft = st.text_area("✍️ Your Draft Message")
 
+    if uploaded_image and user_draft:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            tmp_file.write(uploaded_image.getvalue())
+            tmp_path = tmp_file.name
 
-    # Button is always visible
-    run = st.button("Generate AI Reply")
+        screenshot_text = extract_text_from_image(tmp_path)
 
-    if run:
-        if not uploaded_image or not user_draft.strip():
-            st.warning("📌 Please upload a screenshot and enter your draft message before submitting.")
-        else:
-            with st.spinner("Analyzing screenshot and refining message..."):
-                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                    tmp_file.write(uploaded_image.getvalue())
-                    tmp_path = tmp_file.name
-
-                screenshot_text = extract_text_from_image(tmp_path)
-
-                principles = '''
+        # Hardcoded principles for now
+        principles = '''
 1. Be clear and confident.
 2. Ask questions, don’t convince.
 3. Use connection > persuasion.
@@ -42,9 +35,9 @@ user_draft = st.text_area("✍️ Your Draft Message")
 5. Stick to the Huddle flow and tone.
 '''
 
-                final_reply = suggest_reply(screenshot_text, user_draft, principles)
-                st.success("✅ Suggested Final Reply")
-                st.write(final_reply)
+        final_reply = suggest_reply(screenshot_text, user_draft, principles)
+        st.subheader("✅ Suggested Final Reply")
+        st.write(final_reply)
 
 
 with tab2:

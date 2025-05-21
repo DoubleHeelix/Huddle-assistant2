@@ -19,18 +19,20 @@ User's draft reply:
 
 Huddle principles to follow:
 {principles}
-
-Return a clear, confident, and connection-driven final reply.
 """
+
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6
     )
+
     final_reply = response.choices[0].message.content.strip()
 
-    # Save to CSV and vector memory
+    # ✅ Save to CSV
     save_interaction(screenshot_text, user_draft, final_reply)
+
+    # ✅ Save to vector memory
     embed_and_store_interaction(screenshot_text, user_draft, final_reply)
 
     return final_reply

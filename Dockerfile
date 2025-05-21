@@ -23,5 +23,8 @@ RUN pip install -r requirements.txt
 # Make port 8501 available to the world outside this container
 EXPOSE 8501
 
+# Copy public files into the app
+COPY public/ /app/public
+
 # Run the app using Streamlit and make sure environment variables are loaded via python-dotenv
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

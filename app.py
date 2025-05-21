@@ -15,7 +15,7 @@ with tab1:
     if uploaded_image:
         from PIL import Image
         image = Image.open(uploaded_image)
-        st.image(image, caption="Uploaded Screenshot", use_column_width=True)
+        st.image(image, caption="Uploaded Screenshot", use_container_width=True)
 
     user_draft = st.text_area("✍️ Your Draft Message")
 

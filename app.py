@@ -10,10 +10,15 @@ st.title("🤝 Huddle Assistant")
 tab1, tab2 = st.tabs(["New Huddle Play", "📚 View Past Huddles"])
 
 with tab1:
-    if uploaded_image:
+uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
+
+if uploaded_image:
     from PIL import Image
     image = Image.open(uploaded_image)
     st.image(image, caption="Uploaded Screenshot", use_column_width=True)
+
+user_draft = st.text_area("✍️ Your Draft Message")
+
 
     # Button is always visible
     run = st.button("Generate AI Reply")

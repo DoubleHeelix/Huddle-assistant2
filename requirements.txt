@@ -4,3 +4,4 @@ pillow
 pytesseract
 notion-client
 python-dotenv
+chromadb

@@ -47,6 +47,20 @@ with tab1:
 
         st.subheader("✅ Suggested Final Reply")
         st.write(final_reply)
+        similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
+        examples_prompt = ""
+        for ex in similar_examples:
+            examples_prompt += f"EXAMPLE\\nScreenshot: {ex['screenshot']}\\nDraft: {ex['draft']}\\nReply Sent: {ex['final'] or ex['ai']}\\n---\\n"
+        st.subheader("🔍 Similar Past Huddles Found")
+        for ex in similar_examples:
+            with st.expander("🧠 Example from Memory"):
+            st.markdown("**🖼 Screenshot Text**")
+            st.write(ex["screenshot"])
+            st.markdown("**📝 Draft**")
+            st.write(ex["draft"])
+            st.markdown("**✅ Final Sent**")
+            st.write(ex["final"] or ex["ai"])
+
 
 with tab2:
     st.subheader("📖 Past Huddle Interactions")

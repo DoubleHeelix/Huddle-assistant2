@@ -1,0 +1,6 @@
+streamlit
+openai
+pillow
+pytesseract
+notion-client
+python-dotenv

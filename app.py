@@ -1,10 +1,12 @@
 import streamlit as st
 from memory import load_all_interactions
 from suggestor import suggest_reply
+from memory_vector import retrieve_similar_examples
 from ocr import extract_text_from_image
 import tempfile
+from PIL import Image
 
-st.set_page_config(page_title="Huddle Assistant with Memory", layout="centered")
+st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 st.title("🤝 Huddle Assistant")
 
 tab1, tab2 = st.tabs(["New Huddle Play", "📚 View Past Huddles"])
@@ -13,19 +15,19 @@ with tab1:
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
 
     if uploaded_image:
-        from PIL import Image
         image = Image.open(uploaded_image)
         st.image(image, caption="Uploaded Screenshot", use_container_width=True)
 
     user_draft = st.text_area("✍️ Your Draft Message")
 
-    if st.button("Generate AI Reply") and uploaded_image and user_draft:
+    if st.button("🚀 Generate Reply") and uploaded_image and user_draft:
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             tmp_file.write(uploaded_image.getvalue())
             tmp_path = tmp_file.name
 
         screenshot_text = extract_text_from_image(tmp_path)
 
+        # Hardcoded principles
         principles = '''
 1. Be clear and confident.
 2. Ask questions, don’t convince.
@@ -34,11 +36,17 @@ with tab1:
 5. Stick to the Huddle flow and tone.
 '''
 
-        final_reply = suggest_reply(screenshot_text, user_draft, principles)
+        # Retrieve similar past huddles
+        similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
+        examples_prompt = ""
+        for ex in similar_examples:
+            examples_prompt += f"EXAMPLE\nScreenshot: {ex['screenshot']}\nDraft: {ex['draft']}\nReply Sent: {ex['final'] or ex['ai']}\n---\n"
+
+        # Include similar examples in prompt
+        final_reply = suggest_reply(screenshot_text, user_draft, principles + "\n\nHere are some similar past plays:\n" + examples_prompt)
+
         st.subheader("✅ Suggested Final Reply")
         st.write(final_reply)
-
-
 
 with tab2:
     st.subheader("📖 Past Huddle Interactions")

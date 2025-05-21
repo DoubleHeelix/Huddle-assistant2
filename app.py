@@ -88,20 +88,20 @@ with tab2:
     ])
 
     with doc_tabs[0]:
-        st.markdown("## 🧩 One Line Bridge", help="Use these warm openers to reconnect")
-        st.markdown(embed_pdf("docs/OLB.pdf"), unsafe_allow_html=True)
+        st.markdown("##One Line Bridge", help="Use these warm openers to reconnect")
+        st.markdown("[📄 Tap here to view the OLB PDF](./public/OLB.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[1]:
-        st.markdown("## 👀 Make People Aware", help="Spark interest with clear awareness")
-        st.markdown(embed_pdf("docs/MPA.pdf"), unsafe_allow_html=True)
+        st.markdown("##Make People Aware", help="Spark interest with clear awareness")
+        st.markdown("[📄 Tap here to view the MPA PDF](./public/MPA.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[2]:
-        st.markdown("## 🚪 Door to Mentorship", help="Invite interest into next steps")
-        st.markdown(embed_pdf("docs/DTM.pdf"), unsafe_allow_html=True)
+        st.markdown("##Door to Mentorship", help="Invite interest into next steps")
+        st.markdown("[📄 Tap here to view the DTM PDF](./public/DTM.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[3]:
-        st.markdown("## ❓ FAQ", help="Handle common questions confidently")
-        st.markdown(embed_pdf("docs/FAQ.pdf"), unsafe_allow_html=True)
+        st.markdown("##FAQ", help="Handle common questions confidently")
+        st.markdown("[📄 Tap here to view the FAQ PDF](./public/FAQ.pdf)", unsafe_allow_html=True)
 
 with tab3:
     st.subheader("📖 Past Huddle Interactions")

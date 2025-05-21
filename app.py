@@ -20,7 +20,7 @@ with tab1:
 
     user_draft = st.text_area("✍️ Your Draft Message")
 
-    if st.button("Generate AI Reply") and uploaded_image and user_draft:
+    if st.button("Generate AI Reply Test") and uploaded_image and user_draft:
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             tmp_file.write(uploaded_image.getvalue())
             tmp_path = tmp_file.name

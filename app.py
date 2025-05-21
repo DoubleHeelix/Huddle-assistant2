@@ -13,21 +13,21 @@ with tab1:
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
     user_draft = st.text_area("✍️ Your Draft Message")
 
-    # Only show the button if both fields have content
-    if uploaded_image and user_draft.strip():
-        run = st.button("🚀 Generate Final Reply")
-    else:
-        run = False
+    # Button is always visible
+    run = st.button("Generate AI Reply")
 
     if run:
-        with st.spinner("Analyzing screenshot and refining message..."):
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                tmp_file.write(uploaded_image.getvalue())
-                tmp_path = tmp_file.name
+        if not uploaded_image or not user_draft.strip():
+            st.warning("📌 Please upload a screenshot and enter your draft message before submitting.")
+        else:
+            with st.spinner("Analyzing screenshot and refining message..."):
+                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                    tmp_file.write(uploaded_image.getvalue())
+                    tmp_path = tmp_file.name
 
-            screenshot_text = extract_text_from_image(tmp_path)
+                screenshot_text = extract_text_from_image(tmp_path)
 
-            principles = '''
+                principles = '''
 1. Be clear and confident.
 2. Ask questions, don’t convince.
 3. Use connection > persuasion.
@@ -35,9 +35,9 @@ with tab1:
 5. Stick to the Huddle flow and tone.
 '''
 
-            final_reply = suggest_reply(screenshot_text, user_draft, principles)
-            st.success("✅ Suggested Final Reply")
-            st.write(final_reply)
+                final_reply = suggest_reply(screenshot_text, user_draft, principles)
+                st.success("✅ Suggested Final Reply")
+                st.write(final_reply)
 
 
 with tab2:

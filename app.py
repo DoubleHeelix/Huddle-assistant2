@@ -4,12 +4,22 @@ from suggestor import suggest_reply
 from memory_vector import retrieve_similar_examples
 from ocr import extract_text_from_image
 import tempfile
+import base64
 from PIL import Image
 
-st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
-st.title("🤝 Huddle Assistant")
+def load_markdown(file_path):
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read()
 
-tab1, tab2 = st.tabs(["New Huddle Play", "📚 View Past Huddles"])
+def embed_pdf(path):
+    with open(path, "rb") as f:
+        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+    return f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+
+st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
+st.title("🤝 Huddle Assistant 🤝")
+
+tab1, tab2, tab3 = st.tabs(["New Huddle Play","View Documents", "📚 View Past Huddles"])
 
 with tab1:
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
@@ -66,8 +76,34 @@ with tab1:
                 st.markdown("**✅ Final Sent**")
                 st.write(ex.get("final") or ex.get("ai", ""))
 
-
 with tab2:
+    st.markdown("### 📚 Key Documents")
+    st.caption("Tap the tabs below to browse important Huddle tools.")
+
+    doc_tabs = st.tabs([
+        "One Line Bridge", 
+        "Make People Aware", 
+        "Door to Mentorship", 
+        "FAQ"
+    ])
+
+    with doc_tabs[0]:
+        st.markdown("## 🧩 One Line Bridge", help="Use these warm openers to reconnect")
+        st.markdown(embed_pdf("docs/OLB.pdf"), unsafe_allow_html=True)
+
+    with doc_tabs[1]:
+        st.markdown("## 👀 Make People Aware", help="Spark interest with clear awareness")
+        st.markdown(embed_pdf("docs/MPA.pdf"), unsafe_allow_html=True)
+
+    with doc_tabs[2]:
+        st.markdown("## 🚪 Door to Mentorship", help="Invite interest into next steps")
+        st.markdown(embed_pdf("docs/DTM.pdf"), unsafe_allow_html=True)
+
+    with doc_tabs[3]:
+        st.markdown("## ❓ FAQ", help="Handle common questions confidently")
+        st.markdown(embed_pdf("docs/FAQ.pdf"), unsafe_allow_html=True)
+
+with tab3:
     st.subheader("📖 Past Huddle Interactions")
     huddles = load_all_interactions()
 

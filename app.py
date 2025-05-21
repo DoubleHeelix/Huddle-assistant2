@@ -10,21 +10,16 @@ st.title("🤝 Huddle Assistant")
 tab1, tab2 = st.tabs(["New Huddle Play", "📚 View Past Huddles"])
 
 with tab1:
-    if "run_huddle" not in st.session_state:
-        st.session_state.run_huddle = False
-
-    if st.button("🔄 Start New Huddle"):
-        st.session_state.run_huddle = False
-        st.experimental_rerun()
-
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
     user_draft = st.text_area("✍️ Your Draft Message")
 
+    # Only show the button if both fields have content
     if uploaded_image and user_draft.strip():
-        if st.button("🚀 Generate Final Reply"):
-            st.session_state.run_huddle = True
+        run = st.button("🚀 Generate Final Reply")
+    else:
+        run = False
 
-    if st.session_state.run_huddle and uploaded_image and user_draft.strip():
+    if run:
         with st.spinner("Analyzing screenshot and refining message..."):
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_file.write(uploaded_image.getvalue())
@@ -43,6 +38,7 @@ with tab1:
             final_reply = suggest_reply(screenshot_text, user_draft, principles)
             st.success("✅ Suggested Final Reply")
             st.write(final_reply)
+
 
 with tab2:
     st.subheader("📖 Past Huddle Interactions")

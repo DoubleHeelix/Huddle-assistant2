@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: huddle-assistant
+    env: docker
+    plan: free
+    region: oregon
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: true
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - Dockerfile
+        - app.py
+        - suggestor.py
+        - memory_vector.py
+        - requirements.txt

@@ -19,14 +19,13 @@ with tab1:
 
     user_draft = st.text_area("✍️ Your Draft Message")
 
-    if uploaded_image and user_draft:
+    if st.button("Generate AI Reply") and uploaded_image and user_draft:
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             tmp_file.write(uploaded_image.getvalue())
             tmp_path = tmp_file.name
 
         screenshot_text = extract_text_from_image(tmp_path)
 
-        # Hardcoded principles for now
         principles = '''
 1. Be clear and confident.
 2. Ask questions, don’t convince.
@@ -38,6 +37,7 @@ with tab1:
         final_reply = suggest_reply(screenshot_text, user_draft, principles)
         st.subheader("✅ Suggested Final Reply")
         st.write(final_reply)
+
 
 
 with tab2:

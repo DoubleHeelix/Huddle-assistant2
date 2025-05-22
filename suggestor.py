@@ -6,7 +6,9 @@ from chromadb import PersistentClient
 from dotenv import load_dotenv
 from openai import OpenAI
 from memory_vector import embed_and_store_interaction
-from memory_vector import retrieve_similar_examples  
+from memory_vector import retrieve_similar_examples
+import os
+from chroma_client import get_chroma_client
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -23,7 +25,10 @@ def zip_query_results(results):
 
 def retrieve_similar_examples(screenshot_text, user_draft):
     #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
+    #chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
+
+    chroma_client = get_chroma_client()
+
 
     collections = [c.name for c in chroma_client.list_collections()]
     if "huddle_memory" not in collections:
@@ -89,4 +94,4 @@ Reply:
         ai_suggested=final_reply
     )
 
-    return final_reply
+    return final_reply, doc_matches

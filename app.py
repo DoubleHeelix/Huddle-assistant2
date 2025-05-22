@@ -25,6 +25,12 @@ st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="c
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     st.markdown("Use these to manually refresh AI memory.")
 
+    model_choice = st.sidebar.radio(
+    "🤖 Choose AI Model", 
+    options=["gpt-4", "gpt-3.5-turbo"],
+    help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
+)
+    
     if st.button("📚 Re-embed Communication Docs"):
         embed_documents()
         st.success("✅ Docs embedded successfully.")
@@ -32,6 +38,7 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     if st.button("🧠 Re-sync Notion Huddles"):
         embed_huddles()
         st.success("✅ Notion memory embedded successfully.")
+
 
 st.title("🤝 Huddle Assistant 🤝")
 
@@ -73,7 +80,8 @@ with tab1:
         final_reply, doc_matches = suggest_reply(
             screenshot_text=screenshot_text,
             user_draft=user_draft,
-            principles=principles + "\n\nHere are some similar past plays:\n" + examples_prompt
+            principles=principles + "\n\nHere are some similar past plays:\n" + examples_prompt,
+            model_name=model_choice
         )
 
         st.subheader("✅ Suggested Final Reply")

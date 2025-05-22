@@ -44,7 +44,7 @@ def retrieve_similar_examples(screenshot_text, user_draft):
 
     return zip_query_results(huddles), zip_query_results(docs)
 
-def suggest_reply(screenshot_text, user_draft, principles):
+def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
     huddle_matches, doc_matches = retrieve_similar_examples(screenshot_text, user_draft)
 
     def format_context(matches):
@@ -79,9 +79,10 @@ Draft: {user_draft}
         }
     ]
 
+    selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4")
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
-        model="gpt-4",
+        model=selected_model,
         messages=messages,
         temperature=0.7
     )

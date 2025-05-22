@@ -25,5 +25,4 @@ RUN pip install -r requirements.txt
 EXPOSE 8501
 
 # Run memory sync first, then launch the app
-
-CMD ["sh", "-c", "echo 📦 Starting memory sync && python memory_sync.py && echo ✅ Sync complete && streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"]
+CMD ["sh", "-c", "echo 📦 Starting memory sync && python memory_sync.py & streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"]

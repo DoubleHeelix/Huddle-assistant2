@@ -3,13 +3,16 @@
 from doc_embedder import embed_documents
 from notion_embedder import embed_huddles
 
-if __name__ == "__main__":
-    print("🔁 Syncing memory collections...")
+print("🧠 Starting full memory sync...")
 
-    print("\n📄 Embedding communication docs...")
+try:
     embed_documents()
+    print("✅ Docs memory embedded.")
+except Exception as e:
+    print("❌ Failed to embed docs:", e)
 
-    print("\n🧠 Embedding Notion huddles...")
+try:
     embed_huddles()
-
-    print("\n✅ All memory successfully embedded!")
+    print("✅ Huddle memory embedded.")
+except Exception as e:
+    print("❌ Failed to embed huddles:", e)

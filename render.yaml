@@ -9,6 +9,10 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: true
+      - key: NOTION_API_KEY
+        sync: true
+      - key: NOTION_MEMORY_DB_ID
+        sync: true
     autoDeploy: true
     buildFilter:
       paths:
@@ -16,4 +20,7 @@ services:
         - app.py
         - suggestor.py
         - memory_vector.py
+        - memory_sync.py          # ✅ ADD THIS
+        - doc_embedder.py         # ✅ OPTIONAL
+        - notion_embedder.py      # ✅ OPTIONAL
         - requirements.txt

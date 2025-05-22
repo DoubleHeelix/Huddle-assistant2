@@ -1,7 +1,8 @@
 streamlit
-openai
-pillow
-pytesseract
+openai>=1.0.0
 notion-client
-python-dotenv
 chromadb
+python-dotenv
+pytesseract
+Pillow
+PyMuPDF

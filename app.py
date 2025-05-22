@@ -6,6 +6,9 @@ from ocr import extract_text_from_image
 import tempfile
 import base64
 from PIL import Image
+from doc_embedder import embed_documents
+from notion_embedder import embed_huddles
+
 
 def load_markdown(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
@@ -17,6 +20,19 @@ def embed_pdf(path):
     return f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
+
+#----------------- Side bar ------------------------
+with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
+    st.markdown("Use these to manually refresh AI memory.")
+
+    if st.button("📚 Re-embed Communication Docs"):
+        embed_documents()
+        st.success("✅ Docs embedded successfully.")
+
+    if st.button("🧠 Re-sync Notion Huddles"):
+        embed_huddles()
+        st.success("✅ Notion memory embedded successfully.")
+
 st.title("🤝 Huddle Assistant 🤝")
 
 tab1, tab2, tab3 = st.tabs(["New Huddle Play","View Documents", "📚 View Past Huddles"])
@@ -37,6 +53,9 @@ with tab1:
             tmp_path = tmp_file.name
 
         screenshot_text = extract_text_from_image(tmp_path)
+        if not screenshot_text.strip():
+            st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
+
 
         principles = '''
 1. Be clear and confident.

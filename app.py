@@ -89,25 +89,6 @@ with tab1:
                 with st.expander(f"🧠 From: {match.get('source', 'Unknown')}"):
                     st.markdown(f"> {match.get('document', '')}")
 
-
-
-        save_huddle_to_notion(
-            screenshot_text=screenshot_text,
-            user_draft=user_draft,
-            ai_reply=final_reply,
-            user_final= None
-            )
-
-        # Save to Notion
-        save_huddle_to_notion(
-            screenshot_text=screenshot_text,
-            user_draft=user_draft,
-            ai_reply=final_reply,
-            user_final=None
-        )
-
-        st.success("✅ Huddle logged to Notion!")
-
         # Show similar examples used
         st.subheader("🔍 Similar Past Huddles Found")
         for ex in similar_examples:
@@ -118,6 +99,16 @@ with tab1:
                 st.write(ex.get("draft", ""))
                 st.markdown("**✅ Final Sent**")
                 st.write(ex.get("final") or ex.get("ai", ""))
+
+         # Save to Notion
+        save_huddle_to_notion(
+            screenshot_text=screenshot_text,
+            user_draft=user_draft,
+            ai_reply=final_reply,
+            user_final=None
+        )
+
+        st.success("✅ Huddle logged to Notion!")
 
 # ------------------- Tab 2 -------------------
 with tab2:

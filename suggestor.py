@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import openai
-from memory import save_interaction
+from memory import save_huddle_to_notion
 from memory_vector import embed_and_store_interaction
 
 load_dotenv()
@@ -30,9 +30,16 @@ Huddle principles to follow:
     final_reply = response.choices[0].message.content.strip()
 
     # ✅ Save to CSV
-    save_interaction(screenshot_text, user_draft, final_reply)
+    save_huddle_to_notion(
+    screenshot_text=screenshot_text,
+    user_draft=user_draft,
+    ai_reply=final_reply,
+    user_final=None
+)
 
     # ✅ Save to vector memory
     embed_and_store_interaction(screenshot_text, user_draft, final_reply)
+
+   
 
     return final_reply

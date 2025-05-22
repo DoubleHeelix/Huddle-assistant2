@@ -1,5 +1,5 @@
 import streamlit as st
-from memory import load_all_interactions
+from memory import save_huddle_to_notion, load_all_interactions
 from suggestor import suggest_reply
 from memory_vector import retrieve_similar_examples
 from ocr import extract_text_from_image
@@ -21,6 +21,7 @@ st.title("🤝 Huddle Assistant 🤝")
 
 tab1, tab2, tab3 = st.tabs(["New Huddle Play","View Documents", "📚 View Past Huddles"])
 
+# ------------------- Tab 1 -------------------
 with tab1:
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
 
@@ -30,14 +31,13 @@ with tab1:
 
     user_draft = st.text_area("✍️ Your Draft Message")
 
-    if st.button("Generate AI Reply Test") and uploaded_image and user_draft:
+    if st.button("Generate AI Reply") and uploaded_image and user_draft:
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             tmp_file.write(uploaded_image.getvalue())
             tmp_path = tmp_file.name
 
         screenshot_text = extract_text_from_image(tmp_path)
 
-        # Hardcoded principles
         principles = '''
 1. Be clear and confident.
 2. Ask questions, don’t convince.
@@ -46,24 +46,37 @@ with tab1:
 5. Stick to the Huddle flow and tone.
 '''
 
-            # Retrieve similar past huddles
         similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
-
-        # Build example prompt for AI
         examples_prompt = ""
         for ex in similar_examples:
             examples_prompt += f"EXAMPLE\nScreenshot: {ex['screenshot']}\nDraft: {ex['draft']}\nReply Sent: {ex['final'] or ex['ai']}\n---\n"
 
-        # Generate final reply
         final_reply = suggest_reply(
-            screenshot_text,
-            user_draft,
-            principles + "\n\nHere are some similar past plays:\n" + examples_prompt
+            screenshot_text=screenshot_text,
+            user_draft=user_draft,
+            principles=principles + "\n\nHere are some similar past plays:\n" + examples_prompt
         )
 
-        # Display the reply
         st.subheader("✅ Suggested Final Reply")
         st.write(final_reply)
+
+
+        save_huddle_to_notion(
+            screenshot_text=screenshot_text,
+            user_draft=user_draft,
+            ai_reply=final_reply,
+            user_final= None
+            )
+
+        # Save to Notion
+        save_huddle_to_notion(
+            screenshot_text=screenshot_text,
+            user_draft=user_draft,
+            ai_reply=final_reply,
+            user_final=None
+        )
+
+        st.success("✅ Huddle logged to Notion!")
 
         # Show similar examples used
         st.subheader("🔍 Similar Past Huddles Found")
@@ -76,6 +89,7 @@ with tab1:
                 st.markdown("**✅ Final Sent**")
                 st.write(ex.get("final") or ex.get("ai", ""))
 
+# ------------------- Tab 2 -------------------
 with tab2:
     st.markdown("### 📚 Key Documents")
     st.caption("Tap the tabs below to browse important Huddle tools.")
@@ -88,21 +102,22 @@ with tab2:
     ])
 
     with doc_tabs[0]:
-        st.markdown("##One Line Bridge", help="Use these warm openers to reconnect")
+        st.markdown("## One Line Bridge", help="Use these warm openers to reconnect")
         st.markdown("[📄 Tap here to view the OLB PDF](./public/OLB.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[1]:
-        st.markdown("##Make People Aware", help="Spark interest with clear awareness")
+        st.markdown("## Make People Aware", help="Spark interest with clear awareness")
         st.markdown("[📄 Tap here to view the MPA PDF](./public/MPA.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[2]:
-        st.markdown("##Door to Mentorship", help="Invite interest into next steps")
+        st.markdown("## Door to Mentorship", help="Invite interest into next steps")
         st.markdown("[📄 Tap here to view the DTM PDF](./public/DTM.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[3]:
-        st.markdown("##FAQ", help="Handle common questions confidently")
+        st.markdown("## FAQ", help="Handle common questions confidently")
         st.markdown("[📄 Tap here to view the FAQ PDF](./public/FAQ.pdf)", unsafe_allow_html=True)
 
+# ------------------- Tab 3 -------------------
 with tab3:
     st.subheader("📖 Past Huddle Interactions")
     huddles = load_all_interactions()

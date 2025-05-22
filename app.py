@@ -70,7 +70,7 @@ with tab1:
         for ex in similar_examples:
             examples_prompt += f"EXAMPLE\nScreenshot: {ex['screenshot']}\nDraft: {ex['draft']}\nReply Sent: {ex['final'] or ex['ai']}\n---\n"
 
-        final_reply = suggest_reply(
+        final_reply, doc_matches = suggest_reply(
             screenshot_text=screenshot_text,
             user_draft=user_draft,
             principles=principles + "\n\nHere are some similar past plays:\n" + examples_prompt
@@ -78,6 +78,17 @@ with tab1:
 
         st.subheader("✅ Suggested Final Reply")
         st.write(final_reply)
+
+        # Show document insights used
+        st.subheader("📄 Relevant Communication Docs Used")
+
+        if not doc_matches: 
+            st.info("No relevant document matches found.")
+        else:
+            for match in doc_matches:
+                with st.expander(f"🧠 From: {match.get('source', 'Unknown')}"):
+                    st.markdown(f"> {match.get('document', '')}")
+
 
 
         save_huddle_to_notion(

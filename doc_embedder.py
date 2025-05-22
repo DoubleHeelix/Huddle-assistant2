@@ -3,6 +3,8 @@ import fitz  # PyMuPDF
 from chromadb import PersistentClient
 import openai
 from dotenv import load_dotenv
+import os
+from chroma_client import get_chroma_client
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -31,8 +33,10 @@ def chunk_text(text, max_chars=1000):
 
 def embed_documents():
     #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
+    #chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
 
+
+    chroma_client = get_chroma_client()
     collection_name = "docs_memory"
     
     if collection_name in [c.name for c in chroma_client.list_collections()]:

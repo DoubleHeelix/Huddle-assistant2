@@ -96,3 +96,28 @@ Draft: {user_draft}
     )
 
     return final_reply, doc_matches
+
+def adjust_tone(original_reply, selected_tone):
+    if not selected_tone or selected_tone == "None":
+        return original_reply
+
+    prompt = f"""
+You are a communication assistant. Take the following message and rewrite it to sound more {selected_tone.lower()}:
+
+Original Message:
+{original_reply}
+
+Rewritten Message:
+"""
+
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are an expert at rephrasing text to match a specific tone."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7
+    )
+
+    return response.choices[0].message.content.strip()

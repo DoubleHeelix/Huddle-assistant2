@@ -1,13 +1,13 @@
 import os
 from notion_client import Client
-from chromadb import PersistentClient
 from dotenv import load_dotenv
-import os
-from chroma_client import get_chroma_client
+from chroma_client import get_chroma_client  # Local/prod selector
 
 load_dotenv()
+
 notion = Client(auth=os.getenv("NOTION_API_KEY"))
 database_id = os.getenv("NOTION_MEMORY_DB_ID")
+collection_name = "huddle_memory"
 
 def fetch_huddles():
     results = notion.databases.query(database_id=database_id).get("results", [])
@@ -32,32 +32,29 @@ Final Edit: {get_text("User Final")[0]['plain_text'] if get_text("User Final") e
 
 
 def embed_huddles():
-    #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    #chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
-    
-
     chroma_client = get_chroma_client()
 
-    collection_name = "huddle_memory"
-    if collection_name in [c.name for c in chroma_client.list_collections()]:
+    # Safely delete and recreate the collection
+    existing = [c.name for c in chroma_client.list_collections()]
+    if collection_name in existing:
         chroma_client.delete_collection(name=collection_name)
+        print(f"🗑️ Deleted existing collection: {collection_name}")
+    
     collection = chroma_client.create_collection(name=collection_name)
+    print(f"📁 Created new collection: {collection_name}")
 
     huddles = fetch_huddles()
+
     for idx, h in enumerate(huddles):
         collection.add(
             documents=[h["text"]],
             ids=[f"notion_{idx}"],
             metadatas=[{"source": "notion", "page_id": h["id"]}]
         )
+
     print(f"✅ Embedded {collection.count()} huddles into '{collection_name}'")
 
 
-# ✅ This block must be outside any function
 if __name__ == "__main__":
     print("📥 Running Notion embedder...")
-    huddles = fetch_huddles()
-    print("📦 Previewing first huddle:", huddles[0] if huddles else "No huddles found.")
     embed_huddles()
-
-

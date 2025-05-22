@@ -23,7 +23,7 @@ def zip_query_results(results):
 
 def retrieve_similar_examples(screenshot_text, user_draft):
     #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    PersistentClient(path="/mnt/data/chroma_memory") # Prod
+    chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
 
     collections = [c.name for c in chroma_client.list_collections()]
     if "huddle_memory" not in collections:

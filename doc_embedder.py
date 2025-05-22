@@ -31,7 +31,7 @@ def chunk_text(text, max_chars=1000):
 
 def embed_documents():
     #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    PersistentClient(path="/mnt/data/chroma_memory") # Prod
+    chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
 
     collection_name = "docs_memory"
     

@@ -343,7 +343,7 @@ with tab3:
     if not huddles:
         st.info("No huddles saved yet.")
     else:
-        for idx, huddle in enumerate(huddles):
+        for idx, huddle in enumerate(sorted_huddles):
             with st.expander(f"Huddle {len(huddles) - idx}: {huddle['timestamp']}"):
                 st.markdown("**🖼 Screenshot Text**")
                 st.write(huddle['screenshot_text'])

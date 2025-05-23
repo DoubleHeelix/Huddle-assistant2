@@ -44,8 +44,10 @@ def embed_and_store_interaction(screenshot_text, user_draft, ai_suggested, user_
         "screenshot": screenshot_text,
         "draft": user_draft,
         "ai": ai_suggested,
-        "final": user_final or ""
+        "final": user_final or "",
+        "boost": 1.0  # Default boost
     }
+    
     uid = hashlib.md5((combined_text + ai_suggested).encode()).hexdigest()
     qdrant.upsert(
         collection_name=COLLECTION_NAME,
@@ -53,23 +55,36 @@ def embed_and_store_interaction(screenshot_text, user_draft, ai_suggested, user_
     )
 
 # Retrieve similar huddles
-def retrieve_similar_examples(screenshot_text, user_draft, top_k=3):
+def retrieve_similar_examples(screenshot_text, user_draft, top_k=3, score_threshold=0.7):
     query = f"{screenshot_text}\n\n{user_draft}"
     vector = get_embedding(query)
 
     search_result = qdrant.search(
         collection_name=COLLECTION_NAME,
         query_vector=vector,
-        limit=top_k
+        limit=top_k,
+        with_payload=True,
+        with_vectors=False
     )
 
     examples = []
     for point in search_result:
         payload = point.payload or {}
+        raw_score = point.score  # original cosine similarity
+        boost = payload.get("boost", 1.0)
+
+        boosted_score = raw_score * boost
+
+        if boosted_score < score_threshold:
+            continue  # filter out weak matches
+
         examples.append({
             "screenshot_text": payload.get("screenshot", ""),
             "user_draft": payload.get("draft", ""),
-            "ai_reply": payload.get("ai", "")
+            "ai_reply": payload.get("ai", ""),
+            "score": round(boosted_score, 3),  # final score with boost
+            "boost": boost,
+            "point_id": point.id  # needed to boost later
         })
 
     return examples

@@ -1,10 +1,14 @@
 from notion_client import Client
 import os
 from dotenv import load_dotenv
+from chroma_client import get_chroma_client
 
 load_dotenv()
+
 notion = Client(auth=os.getenv("NOTION_API_KEY"))
 database_id = os.getenv("NOTION_MEMORY_DB_ID")
+collection_name = "huddle_memory"  # <-- 🔧 required to fix the error
+
 
 
 def fetch_huddles():

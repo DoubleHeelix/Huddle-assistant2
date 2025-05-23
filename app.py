@@ -152,37 +152,35 @@ def render_polished_card(label, text, auto_copy=False):
     components.html(full_html, height=fixed_height, scrolling=True)
 
 
-# ----------- Sidebar -----------
-with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
-    st.markdown("Use these to manually refresh AI memory.")
+# ----------- Global Model Selector (Set Before Sidebar) -----------
+model_choice = st.sidebar.radio(
+    "🤖 Choose AI Model",
+    options=["gpt-4", "gpt-3.5-turbo"],
+    help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
+)
 
-    model_choice = st.sidebar.radio(
-        "🤖 Choose AI Model",
-        options=["gpt-4", "gpt-3.5-turbo"],
-        help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
-    )
+# ----------- Sidebar Admin Controls -----------
+with st.sidebar:
+    with st.expander("⚙️ Admin Controls", expanded=False):
+        st.markdown("Use these to manually refresh AI memory.")
 
-    if st.button("📚 Re-embed Communication Docs"):
-        embed_documents()
-        st.success("✅ Docs embedded successfully.")
+        if st.button("📚 Re-embed Communication Docs"):
+            embed_documents()
+            st.success("✅ Docs embedded successfully.")
 
-    if st.button("🧠 Re-sync Notion Huddles"):
-        embed_huddles_qdrant()
-        st.success("✅ Notion memory embedded successfully.")
-        
-    if st.button("🔄 Reset All Boosts to 1.0"):
+        if st.button("🧠 Re-sync Notion Huddles"):
+            embed_huddles_qdrant()
+            st.success("✅ Notion memory embedded successfully.")
+
+        if st.button("🔄 Reset All Boosts to 1.0"):
             try:
                 from qdrant_client.models import Filter, Payload, FieldCondition, MatchAny
-    
-                # Fetch all boosted huddles
                 scroll = qdrant.scroll(
                     collection_name="huddle_memory",
                     with_payload=True,
-                    limit=1000  # adjust if needed
+                    limit=1000
                 )
-    
                 point_ids = [point.id for point in scroll[0] if point.payload.get("boost", 1.0) > 1.0]
-    
                 if point_ids:
                     qdrant.set_payload(
                         collection_name="huddle_memory",
@@ -195,9 +193,12 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
             except Exception as e:
                 st.error(f"⚠️ Failed to reset boosts: {e}")
 
+
+
 # ----------- Main App Tabs -----------
 st.title("🤝 Huddle Assistant 🤝")
 tab1, tab2, tab3 = st.tabs(["New Huddle Play", "View Documents", "📚 View Past Huddles"])
+
 
 # ----------- Tab 1: New Huddle Play -----------
 with tab1:
@@ -225,7 +226,6 @@ with tab1:
         if not screenshot_text.strip():
             st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
         else:
-            from memory_vector import retrieve_similar_examples
             similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
             st.session_state.similar_examples = similar_examples
 
@@ -241,9 +241,8 @@ with tab1:
                 screenshot_text=screenshot_text,
                 user_draft=user_draft,
                 principles=principles,
-                model_name=model_choice
+                model_name=model_choice  # ✅ this now works
             )
-
             st.session_state.final_reply = final_reply
             st.session_state.doc_matches = doc_matches
             st.session_state.screenshot_text = screenshot_text
@@ -333,22 +332,29 @@ Here is the original reply:
     
     
     if st.session_state.final_reply:
-        save_huddle_to_notion(
-            screenshot_text=st.session_state.screenshot_text,
-            user_draft=st.session_state.user_draft,
-            ai_reply=st.session_state.final_reply,
-            user_final=st.session_state.adjusted_reply
-        )
-
-        from memory_vector import embed_and_store_interaction
-        embed_and_store_interaction(
-            screenshot_text=st.session_state.screenshot_text,
-            user_draft=st.session_state.user_draft,
-            ai_suggested=st.session_state.final_reply,
-            user_final=st.session_state.adjusted_reply
-        )
-
-        st.success("✅ Huddle logged to Notion and Qdrant!")
+        screenshot_len = len(st.session_state.screenshot_text.strip())
+        draft_len = len(st.session_state.user_draft.strip())
+    
+        if screenshot_len < 20 or draft_len < 20:
+            st.info("🛑 This huddle was too short or low-value — not saved to memory.")
+        else:
+            save_huddle_to_notion(
+                screenshot_text=st.session_state.screenshot_text,
+                user_draft=st.session_state.user_draft,
+                ai_reply=st.session_state.final_reply,
+                user_final=st.session_state.adjusted_reply
+            )
+    
+            from memory_vector import embed_and_store_interaction
+            embed_and_store_interaction(
+                screenshot_text=st.session_state.screenshot_text,
+                user_draft=st.session_state.user_draft,
+                ai_suggested=st.session_state.final_reply,
+                user_final=st.session_state.adjusted_reply
+            )
+    
+            st.success("✅ Huddle logged to Notion and Qdrant!")
+    
 
 
 # ----------- Tab 2: View Documents -----------

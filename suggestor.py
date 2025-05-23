@@ -103,7 +103,7 @@ Draft: {user_draft}
     selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4")
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
-        model=model_choice,
+        model=selected_model,
         messages=messages,
         temperature=0.7,
         stream=True  # ✅ Enable streaming

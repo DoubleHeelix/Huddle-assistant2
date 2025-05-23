@@ -1,14 +1,16 @@
+from qdrant_client import QdrantClient  # <-- fixed import
+from qdrant_client.models import PointStruct, VectorParams, Distance
+from vectorizer import embed_batch
 import os
 import fitz  # PyMuPDF
-from chromadb import PersistentClient
-import openai
 from dotenv import load_dotenv
-import os
-from chroma_client import get_chroma_client
+from uuid import uuid4  # ✅ for safe Qdrant point IDs
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
 pdf_dir = "public"
+collection_name = "docs_memory"
+VECTOR_SIZE = 1536  # OpenAI embeddings
 
 def extract_text_from_pdf(path):
     doc = fitz.open(path)
@@ -32,35 +34,43 @@ def chunk_text(text, max_chars=1000):
     return chunks
 
 def embed_documents():
-    #chroma_client = PersistentClient(path="local_chroma_db")  # local dev path
-    #chroma_client = PersistentClient(path="/mnt/data/chroma_memory") # Prod
+    client = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
 
+    try:
+        client.get_collection(collection_name)
+    except Exception:
+        print(f"📁 Creating Qdrant collection: {collection_name}")
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
+        )
 
-    chroma_client = get_chroma_client()
-    collection_name = "docs_memory"
-    
-    if collection_name in [c.name for c in chroma_client.list_collections()]:
-        chroma_client.delete_collection(name=collection_name)
-    collection = chroma_client.create_collection(name=collection_name)
+    points = []
+    id_counter = 0
 
     for filename in os.listdir(pdf_dir):
         if filename.endswith(".pdf"):
             path = os.path.join(pdf_dir, filename)
             raw_text = extract_text_from_pdf(path)
             chunks = chunk_text(raw_text)
-            for i, chunk in enumerate(chunks):
-                collection.add(
-                    documents=[chunk],
-                    ids=[f"{filename}_{i}"],
-                    metadatas=[{"source": filename}]
+
+            vectors = embed_batch(chunks)  # list of 1536-dim vectors
+
+            for chunk, vector in zip(chunks, vectors):
+                points.append(
+                    PointStruct(
+                        id=str(uuid4()),  # ✅ UUID-style string as ID
+                        vector=vector,
+                        payload={
+                            "document": chunk,
+                            "source": filename
+                        }
+                    )
                 )
+                id_counter += 1
 
-    print(f"✅ Embedded {collection.count()} chunks into '{collection_name}'")
-
-
-# ✅ This must be OUTSIDE the function
-if __name__ == "__main__":
-    print("📄 Running doc embedder...")
-    embed_documents()
-
-
+    client.upsert(collection_name=collection_name, points=points)
+    print(f"✅ Embedded {id_counter} chunks into Qdrant '{collection_name}'")

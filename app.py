@@ -67,24 +67,18 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-def format_text_html(text):
-    text = re.sub(r"^\s*\n*", "", text.strip())          # Remove leading newlines
-    text = re.sub(r"\n{3,}", "\n\n", text)               # Normalize multiple newlines
-    return text.replace('\n', '<br>')                    # Replace newlines with <br>
-
 def render_polished_card(label, text, auto_copy=False):
+
+    def format_text_html(text):
+        text = re.sub(r"^\s*\n*", "", text.strip())
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.replace('\n', '<br>')
+
     safe_text = text.replace("`", "\\`").replace("\\", "\\\\").replace('"', '\\"')
     formatted_html = format_text_html(text)
 
-    avg_chars_per_line = 80
-    base_height = 160
-    line_height = 22
-    line_count = math.ceil(len(text) / avg_chars_per_line)
-    dynamic_height = base_height + (line_count * line_height)
-
-    min_height = 400
-    max_height = 1200
-    final_height = min(max(dynamic_height + 200, min_height), max_height)
+    # Fixed height for scrollable content inside
+    fixed_height = 400  # 👈 Adjust this value to your preferred height
 
     auto_copy_script = f"""
         <script>
@@ -102,14 +96,14 @@ def render_polished_card(label, text, auto_copy=False):
     """ if auto_copy else ""
 
     full_html = f"""
-    <div id="replyCardWrapper" style="
+    <div style="
         max-width: 100vw;
         background-color: #1e1e1e;
         border: 1px solid #333;
         border-radius: 12px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         padding: 16px;
-        margin-bottom: 0px;
+        margin: 0;
         font-family: 'Segoe UI', sans-serif;
         font-size: 16px;
         color: #f0f0f0;
@@ -118,11 +112,12 @@ def render_polished_card(label, text, auto_copy=False):
         <div id="copyText" style="
             background: #2a2a2a;
             border-radius: 8px;
-            padding: 4px 12px 12px 12px;
+            padding: 12px;
             white-space: normal;
             line-height: 1.6;
             border: 1px solid #444;
             overflow-y: auto;
+            height: {fixed_height}px;
         ">
             {formatted_html}
         </div>
@@ -152,16 +147,7 @@ def render_polished_card(label, text, auto_copy=False):
     </div>
     """
 
-    # Inject CSS to reduce bottom spacing between the HTML component and the next Streamlit element
-    st.markdown("""
-        <style>
-        div:has(> iframe[title="streamlit.components.v1.html"]) + div {
-            margin-top: -1rem !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    components.html(full_html, height=final_height, scrolling=True)
+    components.html(full_html, height=fixed_height, scrolling=True)
 
 
 # ----------- Sidebar -----------
@@ -285,7 +271,6 @@ Here is the original reply:
             with st.expander(f"🔁 Past Huddle {idx + 1}"):
                 st.markdown("**🖼 Screenshot Text**")
                 st.markdown(example.get("screenshot_text", "_Not available_"))
-                st.write("🔍 DEBUG - Similar example payload:", example)
 
                 st.markdown("**✍️ User Draft**")
                 st.markdown(example.get("user_draft", "_Not available_"))

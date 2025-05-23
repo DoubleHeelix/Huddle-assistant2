@@ -36,6 +36,8 @@ def load_all_interactions():
     for page in results:
         props = page["properties"]
         interactions.append({
+            "id": page["id"],
+            "last_edited": page["last_edited_time"],
             "timestamp": props["Timestamp"]["date"]["start"] if props["Timestamp"]["date"] else "Unknown",
             "screenshot_text": props["Screenshot Text"]["rich_text"][0]["plain_text"] if props["Screenshot Text"]["rich_text"] else "",
             "user_draft": props["User Draft"]["rich_text"][0]["plain_text"] if props["User Draft"]["rich_text"] else "",

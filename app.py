@@ -23,6 +23,36 @@ def embed_pdf(path):
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 
+#------------------Get device
+
+import streamlit as st
+
+# Inject mobile detection JavaScript
+st.markdown("""
+<script>
+    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    window.parent.postMessage({ type: 'MOBILE_DEVICE', value: isMobile }, "*");
+</script>
+""", unsafe_allow_html=True)
+
+# Store mobile detection state
+if "is_mobile" not in st.session_state:
+    st.session_state.is_mobile = False
+
+# Access query params to trigger JS execution
+_ = st.query_params  # replaces deprecated experimental_get_query_params()
+
+# Set up message listener
+st.markdown("""
+<script>
+    window.addEventListener("message", (event) => {
+        if (event.data?.type === "MOBILE_DEVICE") {
+            window.parent.postMessage({ streamlitSetComponentValue: { key: "is_mobile", value: event.data.value }}, "*");
+        }
+    });
+</script>
+""", unsafe_allow_html=True)
+
 #----------------- Side bar ------------------------
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     st.markdown("Use these to manually refresh AI memory.")
@@ -44,6 +74,86 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
 st.title("🤝 Huddle Assistant 🤝")
 
 tab1, tab2, tab3 = st.tabs(["New Huddle Play","View Documents", "📚 View Past Huddles"])
+
+import streamlit.components.v1 as components
+import re
+
+def format_text_html(text):
+    text = re.sub(r"^\s*\n*", "", text.strip())
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.replace('\n', '<br>')
+
+def render_polished_card(label, text, auto_copy=False, height=540):
+    safe_text = text.replace("`", "\\`").replace("\\", "\\\\").replace('"', '\\"')
+    formatted_html = format_text_html(text)
+
+    auto_copy_script = f"""
+        <script>
+            window.addEventListener('DOMContentLoaded', () => {{
+                navigator.clipboard.writeText(`{safe_text}`);
+                const alertBox = document.getElementById('copyAlert');
+                if (alertBox) {{
+                    alertBox.style.display = 'inline-block';
+                    setTimeout(() => {{
+                        alertBox.style.display = 'none';
+                    }}, 1500);
+                }}
+            }});
+        </script>
+    """ if auto_copy else ""
+
+    components.html(f"""
+    <div style="
+        background-color: #1e1e1e;
+        border: 1px solid #333;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        padding: 16px;
+        margin: 0;
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 16px;
+        color: #f0f0f0;
+    ">
+        <h4 style="margin: 0 0 12px 0;">{label}</h4>
+        <div id="copyText" style="
+            max-height: 260px;
+            overflow-y: auto;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 4px 12px 12px 12px;
+            margin-top: -4px;
+            margin-bottom: 8px;
+            white-space: normal;
+            line-height: 1.6;
+            border: 1px solid #444;
+        ">
+            {formatted_html}
+        </div>
+        <button onclick="
+            navigator.clipboard.writeText(document.getElementById('copyText').innerText);
+            const alertBox = document.getElementById('copyAlert');
+            alertBox.style.display = 'inline-block';
+            setTimeout(() => {{
+                alertBox.style.display = 'none';
+            }}, 1500);
+        " style="
+            padding: 6px 12px;
+            background-color: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+        ">
+            📋 Copy to Clipboard
+        </button>
+        <span id="copyAlert" style="display: none; margin-left: 10px; color: #22c55e; font-weight: 500;">
+            ✅ Copied!
+        </span>
+        {auto_copy_script}
+    </div>
+    """, height=400)  # reduced height from 540–600 to 400
+
 
 # ------------------- Tab 1 -------------------
 with tab1:
@@ -108,9 +218,15 @@ with tab1:
 
     if st.session_state.final_reply:
         st.subheader("✅ Suggested Final Reply")
-        st.write(st.session_state.final_reply)
+        
+        is_mobile = st.session_state.get("is_mobile", False)
+        height = 400 if is_mobile else 540
+        
+        render_polished_card("", st.session_state.final_reply, auto_copy=True, height=height)
 
-        tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
+        with st.container():
+            st.markdown('<div style="margin-top: -10px;"></div>', unsafe_allow_html=True)
+            tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
 
         if tone != "None" and st.button("🎯 Regenerate with Tone"):
             tone_prompt = f"Rewrite the reply to sound more {tone.lower()}."
@@ -133,7 +249,11 @@ Here is the original reply:
 
     if st.session_state.adjusted_reply:
         st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
-        st.write(st.session_state.adjusted_reply)
+        
+        is_mobile = st.session_state.get("is_mobile", False)
+        height = 400 if is_mobile else 540
+        render_polished_card(f"", st.session_state.adjusted_reply,height=height)
+        
 
     if st.session_state.doc_matches:
         st.subheader("📄 Relevant Communication Docs Used")

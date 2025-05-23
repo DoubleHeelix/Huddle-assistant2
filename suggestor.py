@@ -2,6 +2,7 @@
 
 import openai
 import os
+import re
 from dotenv import load_dotenv
 from openai import OpenAI
 from memory_vector import embed_and_store_interaction
@@ -10,11 +11,12 @@ from chroma_client import get_chroma_client
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Helper to flatten Chroma query results with truncation
+# Constants
 MAX_HUDDLES = 3
 MAX_DOCS = 2
 MAX_CHUNK_LEN = 500
 
+# Helper to flatten Chroma query results with truncation
 def zip_query_results(results):
     return [
         {
@@ -43,6 +45,12 @@ def retrieve_similar_examples(screenshot_text, user_draft):
     docs = docs_collection.query(query_texts=[doc_query], n_results=MAX_DOCS)
 
     return zip_query_results(huddles), zip_query_results(docs)
+
+def clean_reply(text):
+    text = text.strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)  # collapse 3+ newlines to 2
+    text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)  # remove leading indentation
+    return text
 
 def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
     huddle_matches, doc_matches = retrieve_similar_examples(screenshot_text, user_draft)
@@ -87,7 +95,7 @@ Draft: {user_draft}
         temperature=0.7
     )
 
-    final_reply = response.choices[0].message.content.strip()
+    final_reply = clean_reply(response.choices[0].message.content)
 
     embed_and_store_interaction(
         screenshot_text=screenshot_text,
@@ -120,4 +128,4 @@ Rewritten Message:
         temperature=0.7
     )
 
-    return response.choices[0].message.content.strip()
+    return clean_reply(response.choices[0].message.content)

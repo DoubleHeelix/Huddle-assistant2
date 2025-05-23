@@ -10,6 +10,7 @@ client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def suggest_reply(screenshot_text, user_draft, principles):
     prompt = f"""
 You are a Huddle Coach helping refine replies in a network marketing setting.
+Do not include any greeting like "Hey [Name]" or "Hi [Name]" — begin the message directly with the key reply. Assume the message will be pasted mid-conversation.
 
 Screenshot text:
 {screenshot_text}

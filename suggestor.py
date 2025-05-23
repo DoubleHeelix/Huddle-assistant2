@@ -1,12 +1,13 @@
-# suggestor.py
-
 import openai
 import os
 import re
 from dotenv import load_dotenv
 from openai import OpenAI
 from memory_vector import embed_and_store_interaction
-from chroma_client import get_chroma_client
+from vectorizer import embed_single
+from qdrant_client import QdrantClient
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+from vectorizer import embed_batch
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -15,42 +16,54 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 MAX_HUDDLES = 3
 MAX_DOCS = 2
 MAX_CHUNK_LEN = 500
+VECTOR_SIZE = 1536
 
-# Helper to flatten Chroma query results with truncation
-def zip_query_results(results):
-    return [
-        {
-            "document": doc[:MAX_CHUNK_LEN].strip(),
-            "source": meta.get("source", "unknown")
-        }
-        for doc, meta in zip(results["documents"][0], results["metadatas"][0])
-    ]
-
-def retrieve_similar_examples(screenshot_text, user_draft):
-    chroma_client = get_chroma_client()
-
-    collections = [c.name for c in chroma_client.list_collections()]
-    if "huddle_memory" not in collections:
-        raise RuntimeError("🧠 'huddle_memory' not found — please run embed_huddles().")
-    if "docs_memory" not in collections:
-        raise RuntimeError("📄 'docs_memory' not found — please run embed_documents().")
-
-    huddle_collection = chroma_client.get_collection("huddle_memory")
-    docs_collection = chroma_client.get_collection("docs_memory")
-
-    huddle_query = screenshot_text + "\n" + user_draft
-    doc_query = user_draft
-
-    huddles = huddle_collection.query(query_texts=[huddle_query], n_results=MAX_HUDDLES)
-    docs = docs_collection.query(query_texts=[doc_query], n_results=MAX_DOCS)
-
-    return zip_query_results(huddles), zip_query_results(docs)
 
 def clean_reply(text):
     text = text.strip()
-    text = re.sub(r"\n{3,}", "\n\n", text)  # collapse 3+ newlines to 2
-    text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)  # remove leading indentation
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
     return text
+
+
+def zip_qdrant_results(results):
+    return [
+        {
+            "document": r.payload.get("document", "")[:MAX_CHUNK_LEN],
+            "source": r.payload.get("source", "unknown")
+        }
+        for r in results
+    ]
+
+
+def retrieve_similar_examples(screenshot_text, user_draft):
+    client = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
+
+    combined_query = screenshot_text + "\n" + user_draft
+    draft_query = user_draft
+
+    huddle_vector = embed_single(combined_query)
+    doc_vector = embed_single(draft_query)
+
+    huddles = client.search(
+        collection_name="huddle_memory",
+        query_vector=huddle_vector,
+        limit=MAX_HUDDLES,
+        with_payload=True
+    )
+
+    docs = client.search(
+        collection_name="docs_memory",
+        query_vector=doc_vector,
+        limit=MAX_DOCS,
+        with_payload=True
+    )
+
+    return zip_qdrant_results(huddles), zip_qdrant_results(docs)
+
 
 def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
     huddle_matches, doc_matches = retrieve_similar_examples(screenshot_text, user_draft)
@@ -104,6 +117,7 @@ Draft: {user_draft}
     )
 
     return final_reply, doc_matches
+
 
 def adjust_tone(original_reply, selected_tone):
     if not selected_tone or selected_tone == "None":

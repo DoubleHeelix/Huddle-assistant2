@@ -1,33 +1,21 @@
 import streamlit as st
 from memory import save_huddle_to_notion, load_all_interactions
 from suggestor import suggest_reply, adjust_tone
-from memory_vector import retrieve_similar_examples
 from ocr import extract_text_from_image
 import tempfile
 import base64
 from PIL import Image
 from doc_embedder import embed_documents
-from notion_embedder import embed_huddles
+from notion_embedder import embed_huddles_qdrant
 import os
 from openai import OpenAI
-
-
-def load_markdown(file_path):
-    with open(file_path, "r", encoding="utf-8") as f:
-        return f.read()
-
-def embed_pdf(path):
-    with open(path, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    return f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+import streamlit.components.v1 as components
+import re
+import math
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 
-#------------------Get device
-
-import streamlit as st
-
-# Inject mobile detection JavaScript
+# ----------- Mobile Device Detection -----------
 st.markdown("""
 <script>
     const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
@@ -35,14 +23,11 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-# Store mobile detection state
 if "is_mobile" not in st.session_state:
     st.session_state.is_mobile = False
 
-# Access query params to trigger JS execution
-_ = st.query_params  # replaces deprecated experimental_get_query_params()
+_ = st.query_params
 
-# Set up message listener
 st.markdown("""
 <script>
     window.addEventListener("message", (event) => {
@@ -53,39 +38,28 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-#----------------- Side bar ------------------------
-with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
-    st.markdown("Use these to manually refresh AI memory.")
-
-    model_choice = st.sidebar.radio(
-        "🤖 Choose AI Model", 
-        options=["gpt-4", "gpt-3.5-turbo"],
-        help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
-    )
-
-    if st.button("📚 Re-embed Communication Docs"):
-        embed_documents()
-        st.success("✅ Docs embedded successfully.")
-
-    if st.button("🧠 Re-sync Notion Huddles"):
-        embed_huddles()
-        st.success("✅ Notion memory embedded successfully.")
-
-st.title("🤝 Huddle Assistant 🤝")
-
-tab1, tab2, tab3 = st.tabs(["New Huddle Play","View Documents", "📚 View Past Huddles"])
-
-import streamlit.components.v1 as components
-import re
+# ----------- Utility Functions -----------
 
 def format_text_html(text):
     text = re.sub(r"^\s*\n*", "", text.strip())
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.replace('\n', '<br>')
 
-def render_polished_card(label, text, auto_copy=False, height=540):
+def render_polished_card(label, text, auto_copy=False):
     safe_text = text.replace("`", "\\`").replace("\\", "\\\\").replace('"', '\\"')
     formatted_html = format_text_html(text)
+
+    # Estimate content height
+    avg_chars_per_line = 80
+    base_height = 160
+    line_height = 22
+    line_count = math.ceil(len(text) / avg_chars_per_line)
+    dynamic_height = base_height + (line_count * line_height)
+
+    # Set minimum and maximum height bounds
+    min_height = 400
+    max_height = 1200
+    final_height = min(max(dynamic_height + 200, min_height), max_height)
 
     auto_copy_script = f"""
         <script>
@@ -102,8 +76,9 @@ def render_polished_card(label, text, auto_copy=False, height=540):
         </script>
     """ if auto_copy else ""
 
-    components.html(f"""
+    full_html = f"""
     <div style="
+        max-width: 100vw;
         background-color: #1e1e1e;
         border: 1px solid #333;
         border-radius: 12px;
@@ -116,16 +91,13 @@ def render_polished_card(label, text, auto_copy=False, height=540):
     ">
         <h4 style="margin: 0 0 12px 0;">{label}</h4>
         <div id="copyText" style="
-            max-height: 260px;
-            overflow-y: auto;
             background: #2a2a2a;
             border-radius: 8px;
             padding: 4px 12px 12px 12px;
-            margin-top: -4px;
-            margin-bottom: 8px;
             white-space: normal;
             line-height: 1.6;
             border: 1px solid #444;
+            overflow-y: auto;
         ">
             {formatted_html}
         </div>
@@ -137,6 +109,7 @@ def render_polished_card(label, text, auto_copy=False, height=540):
                 alertBox.style.display = 'none';
             }}, 1500);
         " style="
+            margin-top: 12px;
             padding: 6px 12px;
             background-color: #22c55e;
             color: white;
@@ -152,23 +125,38 @@ def render_polished_card(label, text, auto_copy=False, height=540):
         </span>
         {auto_copy_script}
     </div>
-    """, height=400)  # reduced height from 540–600 to 400
+    """
+
+    components.html(full_html, height=final_height, scrolling=True)
 
 
-# ------------------- Tab 1 -------------------
+# ----------- Sidebar -----------
+with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
+    st.markdown("Use these to manually refresh AI memory.")
+
+    model_choice = st.sidebar.radio(
+        "🤖 Choose AI Model",
+        options=["gpt-4", "gpt-3.5-turbo"],
+        help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
+    )
+
+    if st.button("📚 Re-embed Communication Docs"):
+        embed_documents()
+        st.success("✅ Docs embedded successfully.")
+
+    if st.button("🧠 Re-sync Notion Huddles"):
+        embed_huddles_qdrant()
+        st.success("✅ Notion memory embedded successfully.")
+
+# ----------- Main App Tabs -----------
+st.title("🤝 Huddle Assistant 🤝")
+tab1, tab2, tab3 = st.tabs(["New Huddle Play", "View Documents", "📚 View Past Huddles"])
+
+# ----------- Tab 1: New Huddle Play -----------
 with tab1:
-    if 'final_reply' not in st.session_state:
-        st.session_state.final_reply = None
-    if 'adjusted_reply' not in st.session_state:
-        st.session_state.adjusted_reply = None
-    if 'doc_matches' not in st.session_state:
-        st.session_state.doc_matches = []
-    if 'similar_examples' not in st.session_state:
-        st.session_state.similar_examples = []
-    if 'screenshot_text' not in st.session_state:
-        st.session_state.screenshot_text = ""
-    if 'user_draft' not in st.session_state:
-        st.session_state.user_draft = ""
+    for key in ["final_reply", "adjusted_reply", "doc_matches", "screenshot_text", "user_draft"]:
+        if key not in st.session_state:
+            st.session_state[key] = None if key != "doc_matches" else []
 
     uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
 
@@ -179,13 +167,14 @@ with tab1:
     user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "")
 
     if st.button("Generate AI Reply") and uploaded_image and user_draft:
-        st.session_state.adjusted_reply = None  # Clear previous tone-adjusted response
+        st.session_state.adjusted_reply = None
 
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             tmp_file.write(uploaded_image.getvalue())
             tmp_path = tmp_file.name
 
         screenshot_text = extract_text_from_image(tmp_path)
+
         if not screenshot_text.strip():
             st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
         else:
@@ -196,37 +185,28 @@ with tab1:
 4. Keep it short, warm, and human.
 5. Stick to the Huddle flow and tone.
 '''
-
-            similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
-            examples_prompt = ""
-            for ex in similar_examples:
-                examples_prompt += f"EXAMPLE\nScreenshot: {ex['screenshot']}\nDraft: {ex['draft']}\nReply Sent: {ex['final'] or ex['ai']}\n---\n"
-
             final_reply, doc_matches = suggest_reply(
                 screenshot_text=screenshot_text,
                 user_draft=user_draft,
-                principles=principles + "\n\nHere are some similar past plays:\n" + examples_prompt,
+                principles=principles,
                 model_name=model_choice
             )
 
-            # Save state
             st.session_state.final_reply = final_reply
             st.session_state.doc_matches = doc_matches
-            st.session_state.similar_examples = similar_examples
             st.session_state.screenshot_text = screenshot_text
             st.session_state.user_draft = user_draft
 
     if st.session_state.final_reply:
         st.subheader("✅ Suggested Final Reply")
+        height = 400 if st.session_state.get("is_mobile", False) else 540
+        render_polished_card("", st.session_state.final_reply, auto_copy=True)
         
-        is_mobile = st.session_state.get("is_mobile", False)
-        height = 400 if is_mobile else 540
+        # Reduce padding between card and tone dropdown
+        st.markdown("<style>div[data-testid='stVerticalBlock'] > div:nth-child(2) { margin-top: -0.5rem !important; }</style>", unsafe_allow_html=True)
         
-        render_polished_card("", st.session_state.final_reply, auto_copy=True, height=height)
-
-        with st.container():
-            st.markdown('<div style="margin-top: -10px;"></div>', unsafe_allow_html=True)
-            tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
+        tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
+        
 
         if tone != "None" and st.button("🎯 Regenerate with Tone"):
             tone_prompt = f"Rewrite the reply to sound more {tone.lower()}."
@@ -249,11 +229,8 @@ Here is the original reply:
 
     if st.session_state.adjusted_reply:
         st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
-        
-        is_mobile = st.session_state.get("is_mobile", False)
-        height = 400 if is_mobile else 540
-        render_polished_card(f"", st.session_state.adjusted_reply,height=height)
-        
+        height = 400 if st.session_state.get("is_mobile", False) else 540
+        render_polished_card("", st.session_state.adjusted_reply)
 
     if st.session_state.doc_matches:
         st.subheader("📄 Relevant Communication Docs Used")
@@ -263,18 +240,6 @@ Here is the original reply:
     else:
         st.info("No relevant document matches found.")
 
-    if st.session_state.similar_examples:
-        st.subheader("🔍 Similar Past Huddles Found")
-        for ex in st.session_state.similar_examples:
-            with st.expander("🧠 Example from Memory"):
-                st.markdown("**🖼 Screenshot Text**")
-                st.write(ex.get("screenshot", ""))
-                st.markdown("**📝 Draft**")
-                st.write(ex.get("draft", ""))
-                st.markdown("**✅ Final Sent**")
-                st.write(ex.get("final") or ex.get("ai", ""))
-
-    # Save to Notion if generated
     if st.session_state.final_reply:
         save_huddle_to_notion(
             screenshot_text=st.session_state.screenshot_text,
@@ -284,36 +249,30 @@ Here is the original reply:
         )
         st.success("✅ Huddle logged to Notion!")
 
-
-# ------------------- Tab 2 -------------------
+# ----------- Tab 2: View Documents -----------
 with tab2:
     st.markdown("### 📚 Key Documents")
     st.caption("Tap the tabs below to browse important Huddle tools.")
 
-    doc_tabs = st.tabs([
-        "One Line Bridge", 
-        "Make People Aware", 
-        "Door to Mentorship", 
-        "FAQ"
-    ])
+    doc_tabs = st.tabs(["One Line Bridge", "Make People Aware", "Door to Mentorship", "FAQ"])
 
     with doc_tabs[0]:
-        st.markdown("## One Line Bridge", help="Use these warm openers to reconnect")
+        st.markdown("## One Line Bridge")
         st.markdown("[📄 Tap here to view the OLB PDF](./public/OLB.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[1]:
-        st.markdown("## Make People Aware", help="Spark interest with clear awareness")
+        st.markdown("## Make People Aware")
         st.markdown("[📄 Tap here to view the MPA PDF](./public/MPA.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[2]:
-        st.markdown("## Door to Mentorship", help="Invite interest into next steps")
+        st.markdown("## Door to Mentorship")
         st.markdown("[📄 Tap here to view the DTM PDF](./public/DTM.pdf)", unsafe_allow_html=True)
 
     with doc_tabs[3]:
-        st.markdown("## FAQ", help="Handle common questions confidently")
+        st.markdown("## FAQ")
         st.markdown("[📄 Tap here to view the FAQ PDF](./public/FAQ.pdf)", unsafe_allow_html=True)
 
-# ------------------- Tab 3 -------------------
+# ----------- Tab 3: Past Interactions -----------
 with tab3:
     st.subheader("📖 Past Huddle Interactions")
     huddles = load_all_interactions()

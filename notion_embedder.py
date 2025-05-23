@@ -1,77 +1,52 @@
-from notion_client import Client
-import os
-from dotenv import load_dotenv
-from chroma_client import get_chroma_client
+def embed_huddles_qdrant():
+    from huddle_fetcher import fetch_huddles
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import PointStruct, VectorParams, Distance
+    from vectorizer import embed_batch
+    from uuid import uuid4
+    import os
 
-load_dotenv()
+    client = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
 
-notion = Client(auth=os.getenv("NOTION_API_KEY"))
-database_id = os.getenv("NOTION_MEMORY_DB_ID")
-collection_name = "huddle_memory"  # <-- 🔧 required to fix the error
+    collection_name = "huddle_memory"
+    VECTOR_SIZE = 1536
 
-
-
-def fetch_huddles():
-    pages = notion.databases.query(database_id=database_id).get("results", [])
-    huddles = []
-
-    for page in pages:
-        props = page["properties"]
-        page_id = page["id"]
-        last_edited = page["last_edited_time"]
-
-        # Safely extract text from properties
-        screenshot_text = props["Screenshot Text"]["rich_text"][0]["plain_text"] if props["Screenshot Text"]["rich_text"] else ""
-        user_draft = props["User Draft"]["rich_text"][0]["plain_text"] if props["User Draft"]["rich_text"] else ""
-        ai_suggested = props["AI Suggested"]["rich_text"][0]["plain_text"] if props["AI Suggested"]["rich_text"] else ""
-        user_final = props["User Final"]["rich_text"][0]["plain_text"] if props["User Final"]["rich_text"] else ""
-
-        # Compose the full body of text to embed
-        full_text = f"""Screenshot: {screenshot_text}
-
-User Draft: {user_draft}
-
-AI Suggested: {ai_suggested}
-
-User Final: {user_final}"""
-
-        huddles.append({
-            "id": page_id,
-            "text": full_text,
-            "last_edited": last_edited
-        })
-
-    return huddles
-
-def embed_huddles():
-    chroma_client = get_chroma_client()
-
-    if collection_name not in [c.name for c in chroma_client.list_collections()]:
-        collection = chroma_client.create_collection(name=collection_name)
-        print(f"📁 Created new collection: {collection_name}")
-    else:
-        collection = chroma_client.get_collection(collection_name)
-
-    print("📥 Fetching Notion huddles...")
-    huddles = fetch_huddles()  # must return: id, text, last_edited
-
-    existing_ids = set(collection.get(ids=None)["ids"])  # All currently embedded
-    new_count = 0
-
-    for idx, h in enumerate(huddles):
-        huddle_id = f"notion_{h['id']}"
-        if huddle_id in existing_ids:
-            continue  # already embedded
-
-        collection.add(
-            documents=[h["text"]],
-            ids=[huddle_id],
-            metadatas=[{
-                "source": "notion",
-                "page_id": h["id"]
-                # optionally store last_edited timestamp
-            }]
+    try:
+        client.get_collection(collection_name)
+    except:
+        print(f"📁 Creating collection: {collection_name}")
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
         )
-        new_count += 1
 
-    print(f"✅ Embedded {new_count} new huddles into '{collection_name}'")
+    huddles = fetch_huddles()
+    print(f"🔎 Found {len(huddles)} huddles to embed")
+
+    batch_size = 20
+    for i in range(0, len(huddles), batch_size):
+        batch = huddles[i:i+batch_size]
+        texts = [h["text"] for h in batch]
+        vectors = embed_batch(texts)
+
+        points = []
+        for h, vec in zip(batch, vectors):
+            points.append(
+                PointStruct(
+                    id=str(uuid4()),
+                    vector=vec,
+                    payload={
+                        "source": "notion",
+                        "page_id": h["id"],
+                        "last_edited": h["last_edited"]
+                    }
+                )
+            )
+
+        client.upsert(collection_name=collection_name, points=points)
+        print(f"✅ Uploaded batch {i//batch_size + 1} with {len(points)} huddles")
+
+    print(f"✅ All {len(huddles)} huddles embedded into Qdrant.")

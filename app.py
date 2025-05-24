@@ -69,32 +69,34 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-def render_polished_card(label, text, auto_copy=False):
+import re
+import uuid
+import streamlit.components.v1 as components
 
+def render_polished_card(label, text, auto_copy=False):
     def format_text_html(text):
         text = re.sub(r"^\s*\n*", "", text.strip())
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.replace('\n', '<br>')
 
-    safe_text = text.replace("`", "\\`").replace("\\", "\\\\").replace('"', '\\"')
+    unique_id = uuid.uuid4().hex[:8]
+    safe_text = text.replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"').replace("\n", "\\n")
     formatted_html = format_text_html(text)
-
-    # Fixed height for scrollable content inside
-    fixed_height = 400  # 👈 Adjust this value to your preferred height
+    fixed_height = 400
 
     auto_copy_script = f"""
-        <script>
-            window.addEventListener('DOMContentLoaded', () => {{
-                navigator.clipboard.writeText(`{safe_text}`);
-                const alertBox = document.getElementById('copyAlert');
-                if (alertBox) {{
-                    alertBox.style.display = 'inline-block';
-                    setTimeout(() => {{
-                        alertBox.style.display = 'none';
-                    }}, 1500);
-                }}
-            }});
-        </script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {{
+            navigator.clipboard.writeText(`{safe_text}`);
+            const alertBox = document.getElementById('copyAlert-{unique_id}');
+            if (alertBox) {{
+                alertBox.style.display = 'inline-block';
+                setTimeout(() => {{
+                    alertBox.style.display = 'none';
+                }}, 1500);
+            }}
+        }});
+    </script>
     """ if auto_copy else ""
 
     full_html = f"""
@@ -103,7 +105,7 @@ def render_polished_card(label, text, auto_copy=False):
         background-color: #1e1e1e;
         border: 1px solid #333;
         border-radius: 12px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 20px 6px rgba(0,0,0,0.1);
         padding: 16px;
         margin: 0;
         font-family: 'Segoe UI', sans-serif;
@@ -111,7 +113,7 @@ def render_polished_card(label, text, auto_copy=False):
         color: #f0f0f0;
     ">
         <h4 style="margin: 0 0 12px 0;">{label}</h4>
-        <div id="copyText" style="
+        <div id="copyText-{unique_id}" style="
             background: #2a2a2a;
             border-radius: 8px;
             padding: 12px;
@@ -124,8 +126,8 @@ def render_polished_card(label, text, auto_copy=False):
             {formatted_html}
         </div>
         <button onclick="
-            navigator.clipboard.writeText(document.getElementById('copyText').innerText);
-            const alertBox = document.getElementById('copyAlert');
+            navigator.clipboard.writeText(document.getElementById('copyText-{unique_id}').innerText);
+            const alertBox = document.getElementById('copyAlert-{unique_id}');
             alertBox.style.display = 'inline-block';
             setTimeout(() => {{
                 alertBox.style.display = 'none';
@@ -142,25 +144,33 @@ def render_polished_card(label, text, auto_copy=False):
         ">
             📋 Copy to Clipboard
         </button>
-        <span id="copyAlert" style="display: none; margin-left: 10px; color: #22c55e; font-weight: 500;">
+        <span id="copyAlert-{unique_id}" style="display: none; margin-left: 10px; color: #22c55e; font-weight: 500;">
             ✅ Copied!
         </span>
         {auto_copy_script}
     </div>
     """
 
-    components.html(full_html, height=fixed_height, scrolling=True)
+    components.html(full_html, height=fixed_height + 70, scrolling=True)
+
 
 
 # ----------- Sidebar -----------
+with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
+    min_words = st.slider("Minimum words in draft", 5, 20, 8)
+    min_chars = st.slider("Minimum characters in screenshot text", 10, 100, 20)
+    require_question = st.checkbox("Require a question in the draft?", value=True)
+
+
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     st.markdown("Use these to manually refresh AI memory.")
 
     model_choice = st.sidebar.radio(
         "🤖 Choose AI Model",
-        options=["gpt-4", "gpt-3.5-turbo"],
+        options=["gpt-4o", "gpt-3.5-turbo"],
         help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
     )
+    
 
     if st.button("📚 Re-embed Communication Docs"):
         embed_documents()
@@ -186,9 +196,9 @@ with tab1:
         image = Image.open(uploaded_image)
         st.image(image, caption="Uploaded Screenshot", use_container_width=True)
 
-    user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "")
+    user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "", height=200)
 
-    if st.button("Generate AI Reply") and uploaded_image and user_draft:
+    if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
         st.session_state.adjusted_reply = None
 
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
@@ -223,39 +233,58 @@ with tab1:
             st.session_state.doc_matches = doc_matches
             st.session_state.screenshot_text = screenshot_text
             st.session_state.user_draft = user_draft
+            
+            # Collect reasons if the huddle doesn't pass quality filters
+            failure_reasons = []
+            
+            if len(user_draft.strip().split()) < min_words:
+                failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+            
+            if len(screenshot_text.strip()) < min_chars:
+                failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+            
+            if require_question and "?" not in user_draft:
+                failure_reasons.append("- Draft doesn't include a question")
+            
+            # Final quality flag
+            is_quality = len(failure_reasons) == 0
+            
+            # Save or display why it failed
+            if is_quality:
+                from memory_vector import embed_and_store_interaction
+                embed_and_store_interaction(
+                    screenshot_text=screenshot_text,
+                    user_draft=user_draft,
+                    ai_suggested=final_reply
+                )
+                save_huddle_to_notion(
+                    screenshot_text,
+                    user_draft,
+                    final_reply,
+                    st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
+                )
+                st.success("💾 Huddle saved successfully.")
+            else:
+                st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                for reason in failure_reasons:
+                    st.markdown(f"• {reason}")
+            
 
     if st.session_state.final_reply:
-        st.subheader("✅ Suggested Final Reply")
-        height = 400 if st.session_state.get("is_mobile", False) else 540
+        st.subheader("✅ Suggested Reply")
         render_polished_card("", st.session_state.final_reply, auto_copy=True)
-
-        st.markdown("<style>div[data-testid='stVerticalBlock'] > div:nth-child(2) { margin-top: -0.5rem !important; }</style>", unsafe_allow_html=True)
+        
 
         tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
 
         if tone != "None" and st.button("🎯 Regenerate with Tone"):
-            tone_prompt = f"Rewrite the reply to sound more {tone.lower()}."
-            revised_messages = [
-                {"role": "system", "content": "You are a helpful and concise assistant."},
-                {"role": "user", "content": f"""
-Here is the original reply:
-{st.session_state.final_reply}
-
-{tone_prompt}
-"""}
-            ]
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            tone_response = client.chat.completions.create(
-                model=model_choice,
-                messages=revised_messages,
-                temperature=0.7
-            )
-            st.session_state.adjusted_reply = tone_response.choices[0].message.content.strip()
+            from suggestor import adjust_tone
+            st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
 
     if st.session_state.adjusted_reply:
         st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
-        height = 400 if st.session_state.get("is_mobile", False) else 540
-        render_polished_card("", st.session_state.adjusted_reply)
+        render_polished_card("Adjusted Reply", st.session_state.adjusted_reply, auto_copy=True)
+    
 
     # 📄 Relevant Documents
     if st.session_state.doc_matches:
@@ -270,27 +299,27 @@ Here is the original reply:
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_API_KEY")
     )
-    
+
     if st.session_state.get("similar_examples"):
         st.subheader("🧠 Similar Past Huddle Plays Used")
         for idx, example in enumerate(st.session_state.similar_examples):
             if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
                 continue
-    
+
             score = example.get("score", None)
             boost = example.get("boost", 1.0)
-            score_label = f" (Similarity: {score}, Boost: {boost}x)" if score else ""
-    
+            score_label = f" (Similarity: {score:.2f}, Boost: {boost:.1f}x)" if score else ""
+
             with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
                 st.markdown("**🖼 Screenshot Text**")
                 st.markdown(example.get("screenshot_text") or "_Not available_")
-    
+
                 st.markdown("**✍️ User Draft**")
                 st.markdown(example.get("user_draft") or "_Not available_")
-    
+
                 st.markdown("**🤖 Final AI Reply**")
                 st.markdown(example.get("ai_reply") or "_Not available_")
-    
+
                 if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
                     new_boost = boost + 1.0
                     try:
@@ -302,7 +331,6 @@ Here is the original reply:
                         st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
                     except Exception as e:
                         st.error(f"⚠️ Failed to boost: {e}")
-    
 
 
 # ----------- Tab 2: View Documents -----------

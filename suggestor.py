@@ -18,12 +18,27 @@ MAX_DOCS = 2
 MAX_CHUNK_LEN = 500
 VECTOR_SIZE = 1536
 
+SYSTEM_PROMPT = (
+    "You're a warm, concise network marketing assistant. "
+    "Write natural replies that feel personal and human. "
+    "Avoid robotic phrases like 'Draft' or greetings like 'Hey there' or 'Hi there'. "
+    "Mirror the user's tone. Follow the 5 Huddle principles: clarity, connection, brevity, flow, empathy."
+)
+
+
 
 def clean_reply(text):
     text = text.strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
-    return text
+
+    # Remove robotic lead-ins
+    replacements = [
+        "This is a draft", "Draft:", "Suggested reply:", "Here is your response:", "Rewritten Message:"
+    ]
+    for phrase in replacements:
+        text = text.replace(phrase, "")
+    return text.strip()
 
 
 def zip_qdrant_results(results):
@@ -79,7 +94,7 @@ def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful and concise network marketing assistant. Follow the 5 Huddle principles: Clarity, Connection, Brevity, Flow, and Empathy."
+            "content": SYSTEM_PROMPT
         },
         {
             "role": "user",
@@ -92,10 +107,10 @@ Here are some relevant examples:
 📄 Communication Docs:
 {doc_context}
 
-Now, based on this and the input below, generate the best possible reply.
+Now, based on this and the input below, generate the most natural and human-sounding reply.
 
 Screenshot: {screenshot_text}
-Draft: {user_draft}
+Message I'm working on: {user_draft}
 """
         }
     ]
@@ -110,12 +125,20 @@ Draft: {user_draft}
 
     final_reply = clean_reply(response.choices[0].message.content)
 
-    embed_and_store_interaction(
-        screenshot_text=screenshot_text,
-        user_draft=user_draft,
-        ai_suggested=final_reply
+    # Determine if the huddle is high quality
+    is_quality = (
+        len(user_draft.strip().split()) >= 8 and
+        len(screenshot_text.strip()) >= 20 and
+        "lorem ipsum" not in screenshot_text.lower()
     )
-
+    
+    if is_quality:
+        embed_and_store_interaction(
+            screenshot_text=screenshot_text,
+            user_draft=user_draft,
+            ai_suggested=final_reply
+        )
+    
     return final_reply, doc_matches
 
 
@@ -124,19 +147,17 @@ def adjust_tone(original_reply, selected_tone):
         return original_reply
 
     prompt = f"""
-You are a communication assistant. Take the following message and rewrite it to sound more {selected_tone.lower()}:
+Take the following message and rewrite it to sound more {selected_tone.lower()}, while still sounding like a human having a natural conversation.
 
-Original Message:
+Message:
 {original_reply}
-
-Rewritten Message:
 """
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
-            {"role": "system", "content": "You are an expert at rephrasing text to match a specific tone."},
+            {"role": "system", "content": "You are an expert at rephrasing text to match a conversational tone with emotional intelligence."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.7

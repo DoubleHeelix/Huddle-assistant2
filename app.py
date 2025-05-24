@@ -181,171 +181,208 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
         st.success("✅ Notion memory embedded successfully.")
 
 # ----------- Main App Tabs -----------
-st.title("🤝 Huddle Assistant 🤝")
+st.markdown("""
+<h1 style="font-size: 28px; text-align: center; margin-bottom: 10px;">
+🤝 Huddle Assistant 🤝
+</h1>
+""", unsafe_allow_html=True)
+
 tab1, tab2, tab3 = st.tabs(["New Huddle Play", "View Documents", "📚 View Past Huddles"])
 
 # ----------- Tab 1: New Huddle Play -----------
 with tab1:
-    for key in ["final_reply", "adjusted_reply", "doc_matches", "screenshot_text", "user_draft", "similar_examples"]:
-        if key not in st.session_state:
-            st.session_state[key] = None if key != "doc_matches" else []
-
-    uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"])
-
-    if uploaded_image:
-        image = Image.open(uploaded_image)
-        st.image(image, caption="Uploaded Screenshot", use_container_width=True)
-    
-    st.components.v1.html("""
-        <script>
-            setTimeout(function() {
-                const frameDoc = window.parent.document;
-                const el = frameDoc.getElementById("draftAnchor");
-                if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    with st.container():
+        st.markdown("<div id='tab1-wrapper'>", unsafe_allow_html=True)
+        for key in ["final_reply", "adjusted_reply", "doc_matches", "screenshot_text", "user_draft", "similar_examples"]:
+            if key not in st.session_state:
+                st.session_state[key] = None if key != "doc_matches" else []
+                
+        # 1️⃣ Initialize session state
+        if "scroll_to_draft" not in st.session_state:
+            st.session_state.scroll_to_draft = False
+        if "last_uploaded_filename" not in st.session_state:
+            st.session_state.last_uploaded_filename = None
+        
+        # 2️⃣ File uploader
+        uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"], key="huddle_upload")
+        
+        # 3️⃣ Scroll trigger only on *new* upload
+        if uploaded_image:
+            current_filename = uploaded_image.name
+        
+            if st.session_state.last_uploaded_filename != current_filename:
+                st.session_state.scroll_to_draft = True
+                st.session_state.last_uploaded_filename = current_filename
+        
+            image = Image.open(uploaded_image)
+            st.image(image, caption="Uploaded Screenshot", use_container_width=True)
+        
+        # 4️⃣ Perform scroll if flagged
+        if st.session_state.scroll_to_draft:
+            st.components.v1.html("""
+                <script>
+                    setTimeout(function() {
+                        const el = window.parent.document.getElementById("draftAnchor");
+                        if (el) {
+                            el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                    }, 400);
+                </script>
+            """, height=0)
+        
+            # ✅ Reset flag so it only scrolls once
+            st.session_state.scroll_to_draft = False
+        
+        # 5️⃣ Draft anchor placement
+        st.markdown("<div id='draftAnchor'></div>", unsafe_allow_html=True)
+        
+        
+        # ✅ Scoped spacing fix (only within tab1-wrapper)
+        st.markdown("""
+            <style>
+                #tab1-wrapper textarea {
+                    margin-top: 60px !important;
                 }
-            }, 400);
-        </script>
-    """, height=0)
-    
-    #achor element    
-    st.markdown("<div id='draftAnchor'></div>", unsafe_allow_html=True)
-    user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "", height=200)
-
-    if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
-        st.session_state.adjusted_reply = None
-
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            tmp_file.write(uploaded_image.getvalue())
-            tmp_path = tmp_file.name
-
-        screenshot_text = extract_text_from_image(tmp_path)
-
-        if not screenshot_text.strip():
-            st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
-        else:
-            from memory_vector import retrieve_similar_examples
-            similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
-            st.session_state.similar_examples = similar_examples
-
-            principles = '''
-1. Be clear and confident.
-2. Ask questions, don’t convince.
-3. Use connection > persuasion.
-4. Keep it short, warm, and human.
-5. Stick to the Huddle flow and tone.
-'''
-
-            final_reply, doc_matches = suggest_reply(
-                screenshot_text=screenshot_text,
-                user_draft=user_draft,
-                principles=principles,
-                model_name=model_choice
-            )
-
-            st.session_state.final_reply = final_reply
-            st.session_state.doc_matches = doc_matches
-            st.session_state.screenshot_text = screenshot_text
-            st.session_state.user_draft = user_draft
-            
-            # Collect reasons if the huddle doesn't pass quality filters
-            failure_reasons = []
-            
-            if len(user_draft.strip().split()) < min_words:
-                failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
-            
-            if len(screenshot_text.strip()) < min_chars:
-                failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
-            
-            if require_question and "?" not in user_draft:
-                failure_reasons.append("- Draft doesn't include a question")
-            
-            # Final quality flag
-            is_quality = len(failure_reasons) == 0
-            
-            # Save or display why it failed
-            if is_quality:
-                from memory_vector import embed_and_store_interaction
-                embed_and_store_interaction(
-                    screenshot_text=screenshot_text,
-                    user_draft=user_draft,
-                    ai_suggested=final_reply
-                )
-                save_huddle_to_notion(
-                    screenshot_text,
-                    user_draft,
-                    final_reply,
-                    st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
-                )
-                st.success("💾 Huddle saved successfully.")
-            else:
-                st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
-                for reason in failure_reasons:
-                    st.markdown(f"• {reason}")
-            
-
-    if st.session_state.final_reply:
-        st.subheader("✅ Suggested Reply")
-        render_polished_card("", st.session_state.final_reply, auto_copy=True)
+            </style>
+        """, unsafe_allow_html=True)
+        
+        user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "", height=200)
         
 
-        tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
+        if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
+            st.session_state.adjusted_reply = None
 
-        if tone != "None" and st.button("🎯 Regenerate with Tone"):
-            from suggestor import adjust_tone
-            st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(uploaded_image.getvalue())
+                tmp_path = tmp_file.name
 
-    if st.session_state.adjusted_reply:
-        st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
-        render_polished_card("Adjusted Reply", st.session_state.adjusted_reply, auto_copy=True)
-    
+            screenshot_text = extract_text_from_image(tmp_path)
 
-    # 📄 Relevant Documents
-    if st.session_state.doc_matches:
-        st.subheader("📄 Relevant Communication Docs Used")
-        for match in st.session_state.doc_matches:
-            with st.expander(f"🧠 From: {match.get('source', 'Unknown')}"):
-                st.markdown(f"> {match.get('document', '')}")
-    else:
-        st.info("No relevant document matches found.")
+            if not screenshot_text.strip():
+                st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
+            else:
+                from memory_vector import retrieve_similar_examples
+                similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
+                st.session_state.similar_examples = similar_examples
 
-    qdrant = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY")
-    )
+                principles = '''
+    1. Be clear and confident.
+    2. Ask questions, don’t convince.
+    3. Use connection > persuasion.
+    4. Keep it short, warm, and human.
+    5. Stick to the Huddle flow and tone.
+    '''
 
-    if st.session_state.get("similar_examples"):
-        st.subheader("🧠 Similar Past Huddle Plays Used")
-        for idx, example in enumerate(st.session_state.similar_examples):
-            if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
-                continue
+                final_reply, doc_matches = suggest_reply(
+                    screenshot_text=screenshot_text,
+                    user_draft=user_draft,
+                    principles=principles,
+                    model_name=model_choice
+                )
 
-            score = example.get("score", None)
-            boost = example.get("boost", 1.0)
-            score_label = f" (Similarity: {score:.2f}, Boost: {boost:.1f}x)" if score else ""
+                st.session_state.final_reply = final_reply
+                st.session_state.doc_matches = doc_matches
+                st.session_state.screenshot_text = screenshot_text
+                st.session_state.user_draft = user_draft
+                
+                # Collect reasons if the huddle doesn't pass quality filters
+                failure_reasons = []
+                
+                if len(user_draft.strip().split()) < min_words:
+                    failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+                
+                if len(screenshot_text.strip()) < min_chars:
+                    failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+                
+                if require_question and "?" not in user_draft:
+                    failure_reasons.append("- Draft doesn't include a question")
+                
+                # Final quality flag
+                is_quality = len(failure_reasons) == 0
+                
+                # Save or display why it failed
+                if is_quality:
+                    from memory_vector import embed_and_store_interaction
+                    embed_and_store_interaction(
+                        screenshot_text=screenshot_text,
+                        user_draft=user_draft,
+                        ai_suggested=final_reply
+                    )
+                    save_huddle_to_notion(
+                        screenshot_text,
+                        user_draft,
+                        final_reply,
+                        st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
+                    )
+                    st.success("💾 Huddle saved successfully.")
+                else:
+                    st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                    for reason in failure_reasons:
+                        st.markdown(f"• {reason}")
+                
 
-            with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
-                st.markdown("**🖼 Screenshot Text**")
-                st.markdown(example.get("screenshot_text") or "_Not available_")
+        if st.session_state.final_reply:
+            st.subheader("✅ Suggested Reply")
+            render_polished_card("", st.session_state.final_reply, auto_copy=True)
+            
 
-                st.markdown("**✍️ User Draft**")
-                st.markdown(example.get("user_draft") or "_Not available_")
+            tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
 
-                st.markdown("**🤖 Final AI Reply**")
-                st.markdown(example.get("ai_reply") or "_Not available_")
+            if tone != "None" and st.button("🎯 Regenerate with Tone"):
+                from suggestor import adjust_tone
+                st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
 
-                if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
-                    new_boost = boost + 1.0
-                    try:
-                        qdrant.set_payload(
-                            collection_name="huddle_memory",
-                            points=[example["point_id"]],
-                            payload={"boost": new_boost}
-                        )
-                        st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
-                    except Exception as e:
-                        st.error(f"⚠️ Failed to boost: {e}")
+        if st.session_state.adjusted_reply:
+            st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
+            render_polished_card("Adjusted Reply", st.session_state.adjusted_reply, auto_copy=True)
+        
 
+        # 📄 Relevant Documents
+        if st.session_state.doc_matches:
+            st.subheader("📄 Relevant Communication Docs Used")
+            for match in st.session_state.doc_matches:
+                with st.expander(f"🧠 From: {match.get('source', 'Unknown')}"):
+                    st.markdown(f"> {match.get('document', '')}")
+        else:
+            st.info("No relevant document matches found.")
+
+        qdrant = QdrantClient(
+            url=os.getenv("QDRANT_URL"),
+            api_key=os.getenv("QDRANT_API_KEY")
+        )
+
+        if st.session_state.get("similar_examples"):
+            st.subheader("🧠 Similar Past Huddle Plays Used")
+            for idx, example in enumerate(st.session_state.similar_examples):
+                if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
+                    continue
+
+                score = example.get("score", None)
+                boost = example.get("boost", 1.0)
+                score_label = f" (Similarity: {score:.2f}, Boost: {boost:.1f}x)" if score else ""
+
+                with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
+                    st.markdown("**🖼 Screenshot Text**")
+                    st.markdown(example.get("screenshot_text") or "_Not available_")
+
+                    st.markdown("**✍️ User Draft**")
+                    st.markdown(example.get("user_draft") or "_Not available_")
+
+                    st.markdown("**🤖 Final AI Reply**")
+                    st.markdown(example.get("ai_reply") or "_Not available_")
+
+                    if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
+                        new_boost = boost + 1.0
+                        try:
+                            qdrant.set_payload(
+                                collection_name="huddle_memory",
+                                points=[example["point_id"]],
+                                payload={"boost": new_boost}
+                            )
+                            st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
+                        except Exception as e:
+                            st.error(f"⚠️ Failed to boost: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)  # 🧩 Close tab1-wrapper container
 
 # ----------- Tab 2: View Documents -----------
 with tab2:

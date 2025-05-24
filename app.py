@@ -13,6 +13,8 @@ from openai import OpenAI
 import streamlit.components.v1 as components
 import re
 import math
+from qdrant_client import QdrantClient
+from qdrant_client.models import Payload
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 
@@ -264,37 +266,43 @@ Here is the original reply:
     else:
         st.info("No relevant document matches found.")
 
-    # 🔁 Similar Past Huddle Plays
+    qdrant = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
+    
     if st.session_state.get("similar_examples"):
         st.subheader("🧠 Similar Past Huddle Plays Used")
         for idx, example in enumerate(st.session_state.similar_examples):
-            with st.expander(f"🔁 Past Huddle {idx + 1}"):
+            if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
+                continue
+    
+            score = example.get("score", None)
+            boost = example.get("boost", 1.0)
+            score_label = f" (Similarity: {score}, Boost: {boost}x)" if score else ""
+    
+            with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
                 st.markdown("**🖼 Screenshot Text**")
-                st.markdown(example.get("screenshot_text", "_Not available_"))
-
+                st.markdown(example.get("screenshot_text") or "_Not available_")
+    
                 st.markdown("**✍️ User Draft**")
-                st.markdown(example.get("user_draft", "_Not available_"))
-
+                st.markdown(example.get("user_draft") or "_Not available_")
+    
                 st.markdown("**🤖 Final AI Reply**")
-                st.markdown(example.get("ai_reply", "_Not available_"))
-
-    if st.session_state.final_reply:
-        save_huddle_to_notion(
-            screenshot_text=st.session_state.screenshot_text,
-            user_draft=st.session_state.user_draft,
-            ai_reply=st.session_state.final_reply,
-            user_final=st.session_state.adjusted_reply
-        )
-
-        from memory_vector import embed_and_store_interaction
-        embed_and_store_interaction(
-            screenshot_text=st.session_state.screenshot_text,
-            user_draft=st.session_state.user_draft,
-            ai_suggested=st.session_state.final_reply,
-            user_final=st.session_state.adjusted_reply
-        )
-
-        st.success("✅ Huddle logged to Notion and Qdrant!")
+                st.markdown(example.get("ai_reply") or "_Not available_")
+    
+                if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
+                    new_boost = boost + 1.0
+                    try:
+                        qdrant.set_payload(
+                            collection_name="huddle_memory",
+                            points=[example["point_id"]],
+                            payload={"boost": new_boost}
+                        )
+                        st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
+                    except Exception as e:
+                        st.error(f"⚠️ Failed to boost: {e}")
+    
 
 
 # ----------- Tab 2: View Documents -----------

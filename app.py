@@ -13,8 +13,6 @@ from openai import OpenAI
 import streamlit.components.v1 as components
 import re
 import math
-from qdrant_client import QdrantClient
-from qdrant_client.models import Payload
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 
@@ -169,31 +167,6 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     if st.button("🧠 Re-sync Notion Huddles"):
         embed_huddles_qdrant()
         st.success("✅ Notion memory embedded successfully.")
-        
-    if st.button("🔄 Reset All Boosts to 1.0"):
-            try:
-                from qdrant_client.models import Filter, Payload, FieldCondition, MatchAny
-    
-                # Fetch all boosted huddles
-                scroll = qdrant.scroll(
-                    collection_name="huddle_memory",
-                    with_payload=True,
-                    limit=1000  # adjust if needed
-                )
-    
-                point_ids = [point.id for point in scroll[0] if point.payload.get("boost", 1.0) > 1.0]
-    
-                if point_ids:
-                    qdrant.set_payload(
-                        collection_name="huddle_memory",
-                        points=point_ids,
-                        payload={"boost": 1.0}
-                    )
-                    st.success(f"✅ Reset boost on {len(point_ids)} huddles.")
-                else:
-                    st.info("ℹ️ No boosted huddles to reset.")
-            except Exception as e:
-                st.error(f"⚠️ Failed to reset boosts: {e}")
 
 # ----------- Main App Tabs -----------
 st.title("🤝 Huddle Assistant 🤝")
@@ -290,48 +263,21 @@ Here is the original reply:
                 st.markdown(f"> {match.get('document', '')}")
     else:
         st.info("No relevant document matches found.")
-    
-    qdrant = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY")
-    )
-    
+
     # 🔁 Similar Past Huddle Plays
     if st.session_state.get("similar_examples"):
         st.subheader("🧠 Similar Past Huddle Plays Used")
         for idx, example in enumerate(st.session_state.similar_examples):
-            if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
-                continue  # Skip completely empty examples
-    
-            score = example.get("score", None)
-            boost = example.get("boost", 1.0)
-            score_label = f" (Similarity: {score}, Boost: {boost}x)" if score else ""
-    
-            with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
+            with st.expander(f"🔁 Past Huddle {idx + 1}"):
                 st.markdown("**🖼 Screenshot Text**")
-                st.markdown(example.get("screenshot_text") or "_Not available_")
-    
+                st.markdown(example.get("screenshot_text", "_Not available_"))
+
                 st.markdown("**✍️ User Draft**")
-                st.markdown(example.get("user_draft") or "_Not available_")
-    
+                st.markdown(example.get("user_draft", "_Not available_"))
+
                 st.markdown("**🤖 Final AI Reply**")
-                st.markdown(example.get("ai_reply") or "_Not available_")
-    
-                # Boost button
-                if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
-                    new_boost = boost + 1.0
-                    try:
-                        qdrant.set_payload(
-                            collection_name="huddle_memory",
-                            points=[example["point_id"]],
-                            payload={"boost": new_boost}
-                        )
-                        st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
-                    except Exception as e:
-                        st.error(f"⚠️ Failed to boost: {e}")
-    
-    
-    
+                st.markdown(example.get("ai_reply", "_Not available_"))
+
     if st.session_state.final_reply:
         save_huddle_to_notion(
             screenshot_text=st.session_state.screenshot_text,

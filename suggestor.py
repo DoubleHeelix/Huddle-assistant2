@@ -103,20 +103,12 @@ Draft: {user_draft}
     selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4")
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
-        model=model_choice,
+        model=selected_model,
         messages=messages,
-        temperature=0.7,
-        stream=True  # ✅ Enable streaming
+        temperature=0.7
     )
-    
-    # Collect stream as text (in suggestor.py)
-    reply_parts = []
-    for chunk in response:
-        if "content" in chunk.choices[0].delta:
-            reply_parts.append(chunk.choices[0].delta.content)
-    
-    final_reply = "".join(reply_parts).strip()
-    
+
+    final_reply = clean_reply(response.choices[0].message.content)
 
     embed_and_store_interaction(
         screenshot_text=screenshot_text,
@@ -133,7 +125,6 @@ def adjust_tone(original_reply, selected_tone):
 
     prompt = f"""
 You are a communication assistant. Take the following message and rewrite it to sound more {selected_tone.lower()}:
-Do not include any greeting like "Hey [Name]" or "Hi [Name] or draft" — begin the message directly with the key reply. Assume the message will be pasted mid-conversation.
 
 Original Message:
 {original_reply}

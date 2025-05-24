@@ -195,7 +195,21 @@ with tab1:
     if uploaded_image:
         image = Image.open(uploaded_image)
         st.image(image, caption="Uploaded Screenshot", use_container_width=True)
-
+    
+    st.components.v1.html("""
+        <script>
+            setTimeout(function() {
+                const frameDoc = window.parent.document;
+                const el = frameDoc.getElementById("draftAnchor");
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            }, 400);
+        </script>
+    """, height=0)
+    
+    #achor element    
+    st.markdown("<div id='draftAnchor'></div>", unsafe_allow_html=True)
     user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "", height=200)
 
     if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:

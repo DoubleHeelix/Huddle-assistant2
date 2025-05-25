@@ -18,6 +18,25 @@ from qdrant_client.models import Payload
 
 st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
 
+
+# Header block
+st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #8a3ffc, #b88cff);
+        padding: 20px;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        font-family: 'Segoe UI', sans-serif;
+        margin-bottom: 24px;
+    ">
+        <h2 style="margin: 0;">🤝 Huddle Assistant</h2>
+        <p style="margin: 4px 0 0 0; font-size: 14px;">Lead confident convos on the go</p>
+    </div>
+""", unsafe_allow_html=True)
+
+
+
 # Global spacing fix (helps Render match local layout)
 st.markdown("""
 <style>
@@ -182,12 +201,40 @@ with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
 
 # ----------- Main App Tabs -----------
 st.markdown("""
-<h1 style="font-size: 28px; text-align: center; margin-bottom: 10px;">
-🤝 Huddle Assistant 🤝
-</h1>
+<style>
+/* Themed Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem !important;
+    background: none !important;
+    border-bottom: 2px solid #27273a !important;
+    margin-bottom: 0px !important;
+    padding: 0 6vw !important;  /* Add side padding for mobile */
+    justify-content: left;
+}
+.stTabs [data-baseweb="tab"] {
+    color: #8a3ffc !important;
+    font-weight: 600;
+    font-size: 1.05rem;
+    padding: 8px 16px !important;
+    border-radius: 16px 16px 0 0;
+    background: none !important;
+    transition: background 0.18s;
+    margin-bottom: -2px;
+}
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(90deg, #8a3ffc 65%, #b88cff 100%) !important;
+    color: #fff !important;
+    border-bottom: 2.5px solid #8a3ffc !important;
+    box-shadow: 0 2px 8px rgba(138,63,252,0.08);
+}
+.stTabs [aria-selected="false"]:hover {
+    background: #ede9fe !important;
+    color: #5d27c1 !important;
+}
+</style>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["New Huddle Play", "View Documents", "📚 View Past Huddles"])
+tab1, tab2, tab3 = st.tabs(["Huddle Play", "View Documents", "📚 View Past Huddles"])
 
 # ----------- Tab 1: New Huddle Play -----------
 with tab1:
@@ -203,8 +250,31 @@ with tab1:
         if "last_uploaded_filename" not in st.session_state:
             st.session_state.last_uploaded_filename = None
         
-        # 2️⃣ File uploader
-        uploaded_image = st.file_uploader("📸 Upload screenshot", type=["jpg", "jpeg", "png"], key="huddle_upload")
+        with st.container():
+            st.markdown("""
+            <div style="
+                background-color: #fff;
+                padding: 10px 12px;
+                border-radius: 10px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                margin-bottom: 12px;
+                text-align: center;
+                font-family: 'Segoe UI', sans-serif;
+            ">
+                <h5 style="color: #8a3ffc; margin: 0 0 8px 0; font-size: 1.15rem; font-weight: 600;">📸 Upload Screenshot </h5>
+            """, unsafe_allow_html=True)
+            # ... rest of upload logic ...
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+            uploaded_image = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"], label_visibility="collapsed", key="upload_img")
+        
+            if uploaded_image:
+                from PIL import Image
+                image = Image.open(uploaded_image)
+                st.image(image, use_container_width=True)
+        
+            st.markdown("</div>", unsafe_allow_html=True)
+        
         
         # 3️⃣ Scroll trigger only on *new* upload
         if uploaded_image:
@@ -214,8 +284,8 @@ with tab1:
                 st.session_state.scroll_to_draft = True
                 st.session_state.last_uploaded_filename = current_filename
         
-            image = Image.open(uploaded_image)
-            st.image(image, caption="Uploaded Screenshot", use_container_width=True)
+            #image = Image.open(uploaded_image)
+            #st.image(image, caption="Uploaded Screenshot", use_container_width=True)
         
         # 4️⃣ Perform scroll if flagged
         if st.session_state.scroll_to_draft:
@@ -246,7 +316,22 @@ with tab1:
             </style>
         """, unsafe_allow_html=True)
         
-        user_draft = st.text_area("✍️ Your Draft Message", value=st.session_state.user_draft or "", height=200)
+        with st.container():
+            st.markdown("""
+            <div style="
+                background-color: #fff;
+                padding: 10px 12px;
+                border-radius: 10px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                margin-bottom: 25px;
+                text-align: center;
+                font-family: 'Segoe UI', sans-serif;
+            ">
+                <h5 style="color: #8a3ffc; margin: 0 0 8px 0; font-size: 1.15rem; font-weight: 600;">✍️ Your Draft Message</h5>
+            """, unsafe_allow_html=True)
+            user_draft = st.text_area("Your Draft Message", label_visibility="collapsed", height=110, key="user_draft")
+            st.markdown("</div>", unsafe_allow_html=True)
+        
         
 
         if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
@@ -283,7 +368,7 @@ with tab1:
                 st.session_state.final_reply = final_reply
                 st.session_state.doc_matches = doc_matches
                 st.session_state.screenshot_text = screenshot_text
-                st.session_state.user_draft = user_draft
+                #st.session_state.user_draft = user_draft
                 
                 # Collect reasons if the huddle doesn't pass quality filters
                 failure_reasons = []
@@ -331,6 +416,42 @@ with tab1:
             if tone != "None" and st.button("🎯 Regenerate with Tone"):
                 from suggestor import adjust_tone
                 st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
+            
+                # Quality check (reuse your sidebar settings)
+                user_draft = st.session_state.user_draft
+                screenshot_text = st.session_state.screenshot_text
+                failure_reasons = []
+            
+                if len(user_draft.strip().split()) < min_words:
+                    failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+                if len(screenshot_text.strip()) < min_chars:
+                    failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+                if require_question and "?" not in user_draft:
+                    failure_reasons.append("- Draft doesn't include a question")
+                is_quality = len(failure_reasons) == 0
+            
+                if is_quality:
+                    # Save to Qdrant
+                    from memory_vector import embed_and_store_interaction
+                    embed_and_store_interaction(
+                        screenshot_text=screenshot_text,
+                        user_draft=user_draft,
+                        ai_suggested=st.session_state.adjusted_reply
+                    )
+                    # Save to Notion
+                    save_huddle_to_notion(
+                        screenshot_text,
+                        user_draft,
+                        st.session_state.final_reply,
+                        st.session_state.adjusted_reply
+                    )
+                    st.success("💾 Tone-adjusted reply saved to Notion and Qdrant.")
+                else:
+                    st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                    for reason in failure_reasons:
+                        st.markdown(f"• {reason}")
+            
+            
 
         if st.session_state.adjusted_reply:
             st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
@@ -429,3 +550,4 @@ with tab3:
                 if huddle['user_final']:
                     st.markdown("**🧠 Final Edit (You)**")
                     st.write(huddle['user_final'])
+        st.markdown("</div>", unsafe_allow_html=True)

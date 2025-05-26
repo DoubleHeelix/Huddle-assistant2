@@ -178,7 +178,7 @@ def render_polished_card(label, text, auto_copy=False):
 with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
     min_words = st.slider("Minimum words in draft", 5, 20, 8)
     min_chars = st.slider("Minimum characters in screenshot text", 10, 100, 20)
-    require_question = st.checkbox("Require a question in the draft?", value=True)
+    require_question = st.checkbox("Require a question in the draft?", value=False)
 
 
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
@@ -482,7 +482,7 @@ with tab1:
                 boost = example.get("boost", 1.0)
                 score_label = f" (Similarity: {score:.2f}, Boost: {boost:.1f}x)" if score else ""
 
-                with st.expander(f"🔁 Past Huddle {idx + 1}{score_label}"):
+                with st.expander(f"🔁 Past Huddle {idx + 1}"):
                     st.markdown("**🖼 Screenshot Text**")
                     st.markdown(example.get("screenshot_text") or "_Not available_")
 

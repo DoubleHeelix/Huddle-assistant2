@@ -306,7 +306,7 @@ with tab1:
                 from PIL import Image
                 image = Image.open(uploaded_image)
                 st.image(image, use_container_width=True)
-        
+                st.session_state.scroll_to_draft = True
             st.markdown("</div>", unsafe_allow_html=True)
         
         
@@ -326,7 +326,7 @@ with tab1:
         
                 with st.spinner("🔍 Extracting text from screenshot..."):
                     st.session_state.ocr_text = extract_text_from_image(tmp_path)
-                    st.session_state.scroll_to_draft = True
+                    
             else:
                 tmp_path = None
         

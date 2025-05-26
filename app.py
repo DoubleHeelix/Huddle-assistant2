@@ -64,7 +64,8 @@ else:
         st.session_state["authenticated"] = False
         st.rerun()
 
-
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
 
 
 # Global spacing fix (helps Render match local layout)
@@ -295,8 +296,11 @@ with tab1:
             """, unsafe_allow_html=True)
             # ... rest of upload logic ...
             st.markdown("</div>", unsafe_allow_html=True)
+            
+
+            
         
-            uploaded_image = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"], label_visibility="collapsed", key="upload_img")
+            uploaded_image = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"], label_visibility="collapsed", key=f"upload_img_{st.session_state.uploader_key}")
         
             if uploaded_image:
                 from PIL import Image
@@ -361,8 +365,6 @@ with tab1:
             """, unsafe_allow_html=True)
             user_draft = st.text_area("Your Draft Message", label_visibility="collapsed", height=110, key="user_draft")
             st.markdown("</div>", unsafe_allow_html=True)
-        
-        
 
         if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
             st.session_state.adjusted_reply = None
@@ -435,11 +437,9 @@ with tab1:
                     for reason in failure_reasons:
                         st.markdown(f"• {reason}")
                 
-
         if st.session_state.final_reply:
             st.subheader("✅ Suggested Reply")
             render_polished_card("", st.session_state.final_reply, auto_copy=True)
-            
 
             tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
 
@@ -487,7 +487,7 @@ with tab1:
             st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
             render_polished_card("Adjusted Reply", st.session_state.adjusted_reply, auto_copy=True)
         
-
+        st.markdown("<div id='suggestedAnchor'></div>", unsafe_allow_html=True)
         # 📄 Relevant Documents
         if st.session_state.doc_matches:
             st.subheader("📄 Relevant Communication Docs Used")
@@ -533,6 +533,19 @@ with tab1:
                             st.success(f"✅ Boosted to {new_boost}x — refresh to apply")
                         except Exception as e:
                             st.error(f"⚠️ Failed to boost: {e}")
+                            
+        if st.button("➕ Start New Huddle", key="new_huddle_button_tab1"):
+            # Remove all relevant session state variables
+            for k in [
+                "final_reply", "adjusted_reply", "doc_matches", "screenshot_text",
+                "user_draft", "similar_examples", "last_uploaded_filename"
+            ]:
+                if k in st.session_state:
+                    del st.session_state[k]
+            # Increment uploader key to force file_uploader to reset
+            st.session_state.uploader_key += 1
+            st.rerun()
+        
         st.markdown("</div>", unsafe_allow_html=True)  # 🧩 Close tab1-wrapper container
 
 # ----------- Tab 2: View Documents -----------

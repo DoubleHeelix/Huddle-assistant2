@@ -314,12 +314,21 @@ with tab1:
         if uploaded_image:
             current_filename = uploaded_image.name
         
-            if st.session_state.last_uploaded_filename != current_filename:
-                st.session_state.scroll_to_draft = True
+            # If new upload or not yet extracted, extract text immediately and cache
+            if (
+                st.session_state.get("last_uploaded_filename") != current_filename
+                or "ocr_text" not in st.session_state
+            ):
                 st.session_state.last_uploaded_filename = current_filename
+                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                    tmp_file.write(uploaded_image.getvalue())
+                    tmp_path = tmp_file.name
         
-            #image = Image.open(uploaded_image)
-            #st.image(image, caption="Uploaded Screenshot", use_container_width=True)
+                with st.spinner("🔍 Extracting text from screenshot..."):
+                    st.session_state.ocr_text = extract_text_from_image(tmp_path)
+                    st.session_state.scroll_to_draft = True
+            else:
+                tmp_path = None
         
         # 4️⃣ Perform scroll if flagged
         if st.session_state.scroll_to_draft:
@@ -368,75 +377,73 @@ with tab1:
 
         if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
             st.session_state.adjusted_reply = None
-            with st.spinner("🔍 Extracting text from screenshot..."):
-                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                    tmp_file.write(uploaded_image.getvalue())
-                    tmp_path = tmp_file.name
-
-                screenshot_text = extract_text_from_image(tmp_path)
-
-                if not screenshot_text.strip():
-                    st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
-                else:
-                    from memory_vector import retrieve_similar_examples
+        
+            screenshot_text = st.session_state.get("ocr_text", "")
+        
+            if not screenshot_text.strip():
+                st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
+            else:
+                from memory_vector import retrieve_similar_examples
+                with st.spinner("🤖 Finding similar past huddles..."):
                     similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
                     st.session_state.similar_examples = similar_examples
-
-                    principles = '''
+        
+                principles = '''
         1. Be clear and confident.
         2. Ask questions, don’t convince.
         3. Use connection > persuasion.
         4. Keep it short, warm, and human.
         5. Stick to the Huddle flow and tone.
         '''
-
+        
+                with st.spinner("✨ Generating AI reply..."):
                     final_reply, doc_matches = suggest_reply(
                         screenshot_text=screenshot_text,
                         user_draft=user_draft,
                         principles=principles,
                         model_name=model_choice
                     )
-
-                    st.session_state.final_reply = final_reply
-                    st.session_state.doc_matches = doc_matches
-                    st.session_state.screenshot_text = screenshot_text
-                    #st.session_state.user_draft = user_draft
-                
-                # Collect reasons if the huddle doesn't pass quality filters
-                failure_reasons = []
-                
-                if len(user_draft.strip().split()) < min_words:
-                    failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
-                
-                if len(screenshot_text.strip()) < min_chars:
-                    failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
-                
-                if require_question and "?" not in user_draft:
-                    failure_reasons.append("- Draft doesn't include a question")
-                
-                # Final quality flag
-                is_quality = len(failure_reasons) == 0
-                
-                # Save or display why it failed
-                if is_quality:
-                    from memory_vector import embed_and_store_interaction
-                    with st.spinner("💾 Saving huddle..."):
-                        embed_and_store_interaction(
-                            screenshot_text=screenshot_text,
-                            user_draft=user_draft,
-                            ai_suggested=final_reply
-                        )
-                        save_huddle_to_notion(
-                            screenshot_text,
-                            user_draft,
-                            final_reply,
-                            st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
-                        )
-                    st.success("💾 Huddle saved successfully.")
-                else:
-                    st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
-                    for reason in failure_reasons:
-                        st.markdown(f"• {reason}")
+        
+                st.session_state.final_reply = final_reply
+                st.session_state.doc_matches = doc_matches
+                st.session_state.screenshot_text = screenshot_text
+        
+            
+            # Collect reasons if the huddle doesn't pass quality filters
+            failure_reasons = []
+            
+            if len(user_draft.strip().split()) < min_words:
+                failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+            
+            if len(screenshot_text.strip()) < min_chars:
+                failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+            
+            if require_question and "?" not in user_draft:
+                failure_reasons.append("- Draft doesn't include a question")
+            
+            # Final quality flag
+            is_quality = len(failure_reasons) == 0
+            
+            # Save or display why it failed
+            if is_quality:
+                from memory_vector import embed_and_store_interaction
+                with st.spinner("💾 Saving huddle..."):
+                    embed_and_store_interaction(
+                        screenshot_text=screenshot_text,
+                        user_draft=user_draft,
+                        ai_suggested=final_reply
+                    )
+                    save_huddle_to_notion(
+                        screenshot_text,
+                        user_draft,
+                        final_reply,
+                        st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
+                    )
+                st.success("💾 Huddle saved successfully.")
+            else:
+                st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                for reason in failure_reasons:
+                    st.markdown(f"• {reason}")
                 
         if st.session_state.final_reply:
             st.subheader("✅ Suggested Reply")
@@ -540,7 +547,7 @@ with tab1:
             # Remove all relevant session state variables
             for k in [
                 "final_reply", "adjusted_reply", "doc_matches", "screenshot_text",
-                "user_draft", "similar_examples", "last_uploaded_filename"
+                "user_draft", "similar_examples", "last_uploaded_filename", "ocr_text"
             ]:
                 if k in st.session_state:
                     del st.session_state[k]

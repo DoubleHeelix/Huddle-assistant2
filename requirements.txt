@@ -12,6 +12,7 @@ certifi==2025.4.26
 charset-normalizer==3.4.2
 chromadb==1.0.10
 click==8.1.8
+streamlit-authenticator
 qdrant-client==1.14.2
 coloredlogs==15.0.1
 Deprecated==1.2.18
@@ -114,3 +115,4 @@ websockets==15.0.1
 wrapt==1.17.2
 zipp==3.21.0
 pyperclip
+

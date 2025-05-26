@@ -15,9 +15,9 @@ import re
 import math
 from qdrant_client import QdrantClient
 from qdrant_client.models import Payload
+import streamlit_authenticator as stauth
 
-st.set_page_config(page_title="Huddle Assistant with Learning Memory", layout="centered")
-
+st.set_page_config(page_title="Test Auth", layout="centered")
 
 # Header block
 st.markdown("""
@@ -34,6 +34,36 @@ st.markdown("""
         <p style="margin: 4px 0 0 0; font-size: 14px;">Lead confident convos on the go</p>
     </div>
 """, unsafe_allow_html=True)
+
+
+#------------------Login--------------------------------
+USERNAME = "test"
+PASSWORD = "test"
+
+def login():
+    st.title("Login Required")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    login_btn = st.button("Login")
+    if login_btn:
+        if username == "test" and password == "test":
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Invalid username or password.")
+
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    login()
+    st.stop()
+else:
+    st.success("You are logged in! 🎉")
+    if st.button("Logout"):
+        st.session_state["authenticated"] = False
+        st.rerun()
+
 
 
 

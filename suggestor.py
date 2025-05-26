@@ -19,11 +19,14 @@ MAX_CHUNK_LEN = 500
 VECTOR_SIZE = 1536
 
 SYSTEM_PROMPT = (
-    "You're a warm, concise network marketing assistant. "
-    "Write natural replies that feel personal and human. "
-    "Avoid robotic phrases like 'Draft' or greetings like 'Hey there' or 'Hi there'. "
-    "Mirror the user's tone. Follow the 5 Huddle principles: clarity, connection, brevity, flow, empathy."
+    "You are a warm, emotionally intelligent, and concise network marketing assistant. "
+    "Speak like a real person would in a personal conversation — not like a scripted email. "
+    "Avoid generic greetings like 'Hey there', 'Hi there', or overly formal openers. "
+    "Instead, mirror the natural tone of the user's draft. "
+    "NEVER start replies with 'Draft', 'Here's a suggestion', or similar filler. "
+    "Follow the 5 Huddle principles: Clarity, Connection, Brevity, Flow, and Empathy."
 )
+
 
 
 
@@ -31,6 +34,7 @@ def clean_reply(text):
     text = text.strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
+    
 
     # Remove robotic lead-ins
     replacements = [

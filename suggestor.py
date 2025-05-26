@@ -19,13 +19,13 @@ MAX_CHUNK_LEN = 500
 VECTOR_SIZE = 1536
 
 SYSTEM_PROMPT = (
-    "You're a warm, concise network marketing assistant. "
-    "Write natural replies that feel personal and human. "
-    "Avoid robotic phrases like 'Draft' or greetings like 'Hey there' or 'Hi there'. "
-    "Mirror the user's tone. Follow the 5 Huddle principles: clarity, connection, brevity, flow, empathy."
+    "You are a warm, concise network marketing assistant. "
+    "Your job is to help improve the user's draft reply for a chat or conversation. "
+    "Write replies that feel personal, human, and natural—never robotic or generic. "
+    "Avoid filler phrases like 'Draft', and never reply to or mention the draft. "
+    "Take inspiration from the user's draft to create the best reply for the conversation in the screenshot. "
+    "Mirror the user's tone and follow the 5 Huddle principles: clarity, connection, brevity, flow, empathy."
 )
-
-
 
 def clean_reply(text):
     text = text.strip()
@@ -40,7 +40,6 @@ def clean_reply(text):
         text = text.replace(phrase, "")
     return text.strip()
 
-
 def zip_qdrant_results(results):
     return [
         {
@@ -49,7 +48,6 @@ def zip_qdrant_results(results):
         }
         for r in results
     ]
-
 
 def retrieve_similar_examples(screenshot_text, user_draft):
     client = QdrantClient(
@@ -79,7 +77,6 @@ def retrieve_similar_examples(screenshot_text, user_draft):
 
     return zip_qdrant_results(huddles), zip_qdrant_results(docs)
 
-
 def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
     huddle_matches, doc_matches = retrieve_similar_examples(screenshot_text, user_draft)
 
@@ -98,20 +95,17 @@ def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
         },
         {
             "role": "user",
-            "content": f"""
-Here are some relevant examples:
-
-🧠 Past Huddles:
-{huddle_context}
-
-📄 Communication Docs:
-{doc_context}
-
-Now, based on this and the input below, generate the most natural and human-sounding reply.
-
-Screenshot: {screenshot_text}
-Message I'm working on: {user_draft}
-"""
+            "content": (
+                "Here are some relevant examples:\n\n"
+                f"🧠 Past Huddles:\n{huddle_context}\n\n"
+                f"📄 Communication Docs:\n{doc_context}\n\n"
+                "Below is the conversation context and the user's draft reply.\n"
+                "Your job is to use the draft as a starting point and rewrite it for the person in the conversation context.\n"
+                "Do NOT reply to the draft. Do NOT reference the draft. Write as if you are sending the message to the person in the screenshot context.\n\n"
+                f"Conversation context (from screenshot):\n{screenshot_text}\n\n"
+                f"User's draft reply (for inspiration):\n{user_draft}\n\n"
+                "Write the best, most natural, and most human reply you would send in this scenario."
+            )
         }
     ]
 
@@ -140,7 +134,6 @@ Message I'm working on: {user_draft}
         )
     
     return final_reply, doc_matches
-
 
 def adjust_tone(original_reply, selected_tone):
     if not selected_tone or selected_tone == "None":

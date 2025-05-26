@@ -368,39 +368,39 @@ with tab1:
 
         if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
             st.session_state.adjusted_reply = None
+            with st.spinner("🔍 Extracting text from screenshot..."):
+                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                    tmp_file.write(uploaded_image.getvalue())
+                    tmp_path = tmp_file.name
 
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                tmp_file.write(uploaded_image.getvalue())
-                tmp_path = tmp_file.name
+                screenshot_text = extract_text_from_image(tmp_path)
 
-            screenshot_text = extract_text_from_image(tmp_path)
+                if not screenshot_text.strip():
+                    st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
+                else:
+                    from memory_vector import retrieve_similar_examples
+                    similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
+                    st.session_state.similar_examples = similar_examples
 
-            if not screenshot_text.strip():
-                st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
-            else:
-                from memory_vector import retrieve_similar_examples
-                similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
-                st.session_state.similar_examples = similar_examples
+                    principles = '''
+        1. Be clear and confident.
+        2. Ask questions, don’t convince.
+        3. Use connection > persuasion.
+        4. Keep it short, warm, and human.
+        5. Stick to the Huddle flow and tone.
+        '''
 
-                principles = '''
-    1. Be clear and confident.
-    2. Ask questions, don’t convince.
-    3. Use connection > persuasion.
-    4. Keep it short, warm, and human.
-    5. Stick to the Huddle flow and tone.
-    '''
+                    final_reply, doc_matches = suggest_reply(
+                        screenshot_text=screenshot_text,
+                        user_draft=user_draft,
+                        principles=principles,
+                        model_name=model_choice
+                    )
 
-                final_reply, doc_matches = suggest_reply(
-                    screenshot_text=screenshot_text,
-                    user_draft=user_draft,
-                    principles=principles,
-                    model_name=model_choice
-                )
-
-                st.session_state.final_reply = final_reply
-                st.session_state.doc_matches = doc_matches
-                st.session_state.screenshot_text = screenshot_text
-                #st.session_state.user_draft = user_draft
+                    st.session_state.final_reply = final_reply
+                    st.session_state.doc_matches = doc_matches
+                    st.session_state.screenshot_text = screenshot_text
+                    #st.session_state.user_draft = user_draft
                 
                 # Collect reasons if the huddle doesn't pass quality filters
                 failure_reasons = []
@@ -420,17 +420,18 @@ with tab1:
                 # Save or display why it failed
                 if is_quality:
                     from memory_vector import embed_and_store_interaction
-                    embed_and_store_interaction(
-                        screenshot_text=screenshot_text,
-                        user_draft=user_draft,
-                        ai_suggested=final_reply
-                    )
-                    save_huddle_to_notion(
-                        screenshot_text,
-                        user_draft,
-                        final_reply,
-                        st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
-                    )
+                    with st.spinner("💾 Saving huddle..."):
+                        embed_and_store_interaction(
+                            screenshot_text=screenshot_text,
+                            user_draft=user_draft,
+                            ai_suggested=final_reply
+                        )
+                        save_huddle_to_notion(
+                            screenshot_text,
+                            user_draft,
+                            final_reply,
+                            st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
+                        )
                     st.success("💾 Huddle saved successfully.")
                 else:
                     st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
@@ -445,41 +446,42 @@ with tab1:
 
             if tone != "None" and st.button("🎯 Regenerate with Tone"):
                 from suggestor import adjust_tone
-                st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
-            
-                # Quality check (reuse your sidebar settings)
-                user_draft = st.session_state.user_draft
-                screenshot_text = st.session_state.screenshot_text
-                failure_reasons = []
-            
-                if len(user_draft.strip().split()) < min_words:
-                    failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
-                if len(screenshot_text.strip()) < min_chars:
-                    failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
-                if require_question and "?" not in user_draft:
-                    failure_reasons.append("- Draft doesn't include a question")
-                is_quality = len(failure_reasons) == 0
-            
-                if is_quality:
-                    # Save to Qdrant
-                    from memory_vector import embed_and_store_interaction
-                    embed_and_store_interaction(
-                        screenshot_text=screenshot_text,
-                        user_draft=user_draft,
-                        ai_suggested=st.session_state.adjusted_reply
-                    )
-                    # Save to Notion
-                    save_huddle_to_notion(
-                        screenshot_text,
-                        user_draft,
-                        st.session_state.final_reply,
-                        st.session_state.adjusted_reply
-                    )
-                    st.success("💾 Tone-adjusted reply saved to Notion and Qdrant.")
-                else:
-                    st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
-                    for reason in failure_reasons:
-                        st.markdown(f"• {reason}")
+                with st.spinner("🎨 Adjusting tone..."):
+                    st.session_state.adjusted_reply = adjust_tone(st.session_state.final_reply, tone)
+                
+                    # Quality check (reuse your sidebar settings)
+                    user_draft = st.session_state.user_draft
+                    screenshot_text = st.session_state.screenshot_text
+                    failure_reasons = []
+                
+                    if len(user_draft.strip().split()) < min_words:
+                        failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+                    if len(screenshot_text.strip()) < min_chars:
+                        failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+                    if require_question and "?" not in user_draft:
+                        failure_reasons.append("- Draft doesn't include a question")
+                    is_quality = len(failure_reasons) == 0
+                
+                    if is_quality:
+                        # Save to Qdrant
+                        from memory_vector import embed_and_store_interaction
+                        embed_and_store_interaction(
+                            screenshot_text=screenshot_text,
+                            user_draft=user_draft,
+                            ai_suggested=st.session_state.adjusted_reply
+                        )
+                        # Save to Notion
+                        save_huddle_to_notion(
+                            screenshot_text,
+                            user_draft,
+                            st.session_state.final_reply,
+                            st.session_state.adjusted_reply
+                        )
+                        st.success("💾 Tone-adjusted reply saved to Notion and Qdrant.")
+                    else:
+                        st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                        for reason in failure_reasons:
+                            st.markdown(f"• {reason}")
             
             
 

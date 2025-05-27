@@ -16,9 +16,7 @@ import math
 from qdrant_client import QdrantClient
 from qdrant_client.models import Payload
 import streamlit_authenticator as stauth
-
 st.set_page_config(page_title="Test Auth", layout="centered")
-
 # Header block
 st.markdown("""
     <div style="
@@ -34,27 +32,20 @@ st.markdown("""
         <p style="margin: 4px 0 0 0; font-size: 14px;">Lead confident convos on the go</p>
     </div>
 """, unsafe_allow_html=True)
-
-
 #------------------Login--------------------------------
-USERNAME = "test"
 PASSWORD = "test"
-
 def login():
     st.title("Login Required")
-    username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     login_btn = st.button("Login")
     if login_btn:
-        if username == "test" and password == "test":
+        if password == "test":
             st.session_state["authenticated"] = True
             st.rerun()
         else:
             st.error("Invalid username or password.")
-
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
-
 if not st.session_state["authenticated"]:
     login()
     st.stop()
@@ -63,11 +54,8 @@ else:
     if st.button("Logout"):
         st.session_state["authenticated"] = False
         st.rerun()
-
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
-
-
 # Global spacing fix (helps Render match local layout)
 st.markdown("""
 <style>
@@ -76,26 +64,21 @@ section.main > div {
     padding-top: 0rem !important;
     padding-bottom: 0rem !important;
 }
-
 /* Tighten spacing under selectbox and subheaders */
 .css-1kyxreq, .stSelectbox, .stMarkdown, .stSubheader {
     margin-bottom: 0.5rem !important;
     margin-top: 0.5rem !important;
 }
-
 /* Reduce expander top spacing */
 .st-expander {
     margin-top: -0.5rem !important;
 }
-
 /* Optional: shrink spacing between AI reply and tone dropdown */
 div[data-testid='stVerticalBlock'] > div:nth-child(2) {
     margin-top: -1rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
-
-
 # ----------- Mobile Device Detection -----------
 st.markdown("""
 <script>
@@ -103,12 +86,9 @@ st.markdown("""
     window.parent.postMessage({ type: 'MOBILE_DEVICE', value: isMobile }, "*");
 </script>
 """, unsafe_allow_html=True)
-
 if "is_mobile" not in st.session_state:
     st.session_state.is_mobile = False
-
 _ = st.query_params
-
 st.markdown("""
 <script>
     window.addEventListener("message", (event) => {
@@ -118,22 +98,18 @@ st.markdown("""
     });
 </script>
 """, unsafe_allow_html=True)
-
 import re
 import uuid
 import streamlit.components.v1 as components
-
 def render_polished_card(label, text, auto_copy=False):
     def format_text_html(text):
         text = re.sub(r"^\s*\n*", "", text.strip())
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.replace('\n', '<br>')
-
     unique_id = uuid.uuid4().hex[:8]
     safe_text = text.replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"').replace("\n", "\\n")
     formatted_html = format_text_html(text)
     fixed_height = 400
-
     auto_copy_script = f"""
     <script>
         window.addEventListener('DOMContentLoaded', () => {{
@@ -148,7 +124,6 @@ def render_polished_card(label, text, auto_copy=False):
         }});
     </script>
     """ if auto_copy else ""
-
     full_html = f"""
     <div style="
         max-width: 100vw;
@@ -200,36 +175,26 @@ def render_polished_card(label, text, auto_copy=False):
         {auto_copy_script}
     </div>
     """
-
     components.html(full_html, height=fixed_height + 70, scrolling=True)
-
-
-
 # ----------- Sidebar -----------
 with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
     min_words = st.slider("Minimum words in draft", 5, 20, 8)
     min_chars = st.slider("Minimum characters in screenshot text", 10, 100, 20)
     require_question = st.checkbox("Require a question in the draft?", value=False)
-
-
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
     st.markdown("Use these to manually refresh AI memory.")
-
     model_choice = st.sidebar.radio(
         "🤖 Choose AI Model",
         options=["gpt-4o", "gpt-3.5-turbo"],
         help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
     )
     
-
     if st.button("📚 Re-embed Communication Docs"):
         embed_documents()
         st.success("✅ Docs embedded successfully.")
-
     if st.button("🧠 Re-sync Notion Huddles"):
         embed_huddles_qdrant()
         st.success("✅ Notion memory embedded successfully.")
-
 # ----------- Main App Tabs -----------
 st.markdown("""
 <style>
@@ -264,9 +229,7 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
 tab1, tab2, tab3 = st.tabs(["Huddle Play", "View Documents", "📚 View Past Huddles"])
-
 # ----------- Tab 1: New Huddle Play -----------
 with tab1:
     with st.container():
@@ -297,7 +260,6 @@ with tab1:
             # ... rest of upload logic ...
             st.markdown("</div>", unsafe_allow_html=True)
             
-
             
         
             uploaded_image = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"], label_visibility="collapsed", key=f"upload_img_{st.session_state.uploader_key}")
@@ -306,30 +268,21 @@ with tab1:
                 from PIL import Image
                 image = Image.open(uploaded_image)
                 st.image(image, use_container_width=True)
-                st.session_state.scroll_to_draft = True
+        
             st.markdown("</div>", unsafe_allow_html=True)
         
         
         # 3️⃣ Scroll trigger only on *new* upload
         if uploaded_image:
             current_filename = uploaded_image.name
-        
-            # If new upload or not yet extracted, extract text immediately and cache
-            if (
-                st.session_state.get("last_uploaded_filename") != current_filename
-                or "ocr_text" not in st.session_state
-            ):
+
+            if st.session_state.last_uploaded_filename != current_filename:
+                st.session_state.scroll_to_draft = True
                 st.session_state.last_uploaded_filename = current_filename
-                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                    tmp_file.write(uploaded_image.getvalue())
-                    tmp_path = tmp_file.name
-        
-                with st.spinner("🔍 Extracting text from screenshot..."):
-                    st.session_state.ocr_text = extract_text_from_image(tmp_path)
-                    
-            else:
-                tmp_path = None
-        
+
+            #image = Image.open(uploaded_image)
+            #st.image(image, caption="Uploaded Screenshot", use_container_width=True)
+
         # 4️⃣ Perform scroll if flagged
         if st.session_state.scroll_to_draft:
             st.components.v1.html("""
@@ -377,80 +330,80 @@ with tab1:
 
         if st.button("🚀 Generate AI Reply") and uploaded_image and user_draft:
             st.session_state.adjusted_reply = None
-        
-            screenshot_text = st.session_state.get("ocr_text", "")
-        
-            if not screenshot_text.strip():
-                st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
-            else:
-                from memory_vector import retrieve_similar_examples
-                with st.spinner("🤖 Finding similar past huddles..."):
+            with st.spinner("🔍 Extracting text from screenshot..."):
+                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                    tmp_file.write(uploaded_image.getvalue())
+                    tmp_path = tmp_file.name
+
+                screenshot_text = extract_text_from_image(tmp_path)
+
+                if not screenshot_text.strip():
+                    st.warning("⚠️ Screenshot text couldn't be read clearly. Please try a clearer image.")
+                else:
+                    from memory_vector import retrieve_similar_examples
                     similar_examples = retrieve_similar_examples(screenshot_text, user_draft)
                     st.session_state.similar_examples = similar_examples
-        
-                principles = '''
+
+                    principles = '''
         1. Be clear and confident.
         2. Ask questions, don’t convince.
         3. Use connection > persuasion.
         4. Keep it short, warm, and human.
         5. Stick to the Huddle flow and tone.
         '''
-        
-                with st.spinner("✨ Generating AI reply..."):
+
                     final_reply, doc_matches = suggest_reply(
                         screenshot_text=screenshot_text,
                         user_draft=user_draft,
                         principles=principles,
                         model_name=model_choice
                     )
-        
-                st.session_state.final_reply = final_reply
-                st.session_state.doc_matches = doc_matches
-                st.session_state.screenshot_text = screenshot_text
-        
-            
-            # Collect reasons if the huddle doesn't pass quality filters
-            failure_reasons = []
-            
-            if len(user_draft.strip().split()) < min_words:
-                failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
-            
-            if len(screenshot_text.strip()) < min_chars:
-                failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
-            
-            if require_question and "?" not in user_draft:
-                failure_reasons.append("- Draft doesn't include a question")
-            
-            # Final quality flag
-            is_quality = len(failure_reasons) == 0
-            
-            # Save or display why it failed
-            if is_quality:
-                from memory_vector import embed_and_store_interaction
-                with st.spinner("💾 Saving huddle..."):
-                    embed_and_store_interaction(
-                        screenshot_text=screenshot_text,
-                        user_draft=user_draft,
-                        ai_suggested=final_reply
-                    )
-                    save_huddle_to_notion(
-                        screenshot_text,
-                        user_draft,
-                        final_reply,
-                        st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
-                    )
-                st.success("💾 Huddle saved successfully.")
-            else:
-                st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
-                for reason in failure_reasons:
-                    st.markdown(f"• {reason}")
+
+                    st.session_state.final_reply = final_reply
+                    st.session_state.doc_matches = doc_matches
+                    st.session_state.screenshot_text = screenshot_text
+                    #st.session_state.user_draft = user_draft
                 
+                # Collect reasons if the huddle doesn't pass quality filters
+                failure_reasons = []
+                
+                if len(user_draft.strip().split()) < min_words:
+                    failure_reasons.append(f"- Your draft only has {len(user_draft.strip().split())} words (min required: {min_words})")
+                
+                if len(screenshot_text.strip()) < min_chars:
+                    failure_reasons.append(f"- Screenshot text has only {len(screenshot_text.strip())} characters (min required: {min_chars})")
+                
+                if require_question and "?" not in user_draft:
+                    failure_reasons.append("- Draft doesn't include a question")
+                
+                # Final quality flag
+                is_quality = len(failure_reasons) == 0
+                
+                # Save or display why it failed
+                if is_quality:
+                    from memory_vector import embed_and_store_interaction
+                    with st.spinner("💾 Saving huddle..."):
+                        embed_and_store_interaction(
+                            screenshot_text=screenshot_text,
+                            user_draft=user_draft,
+                            ai_suggested=final_reply
+                        )
+                        save_huddle_to_notion(
+                            screenshot_text,
+                            user_draft,
+                            final_reply,
+                            st.session_state.get("adjusted_reply", "")  # Optional: passes user_final if available
+                        )
+                    st.success("💾 Huddle saved successfully.")
+                else:
+                    st.warning("⚠️ This huddle wasn't saved due to the following reason(s):")
+                    for reason in failure_reasons:
+                        st.markdown(f"• {reason}")
+
         if st.session_state.final_reply:
             st.subheader("✅ Suggested Reply")
             render_polished_card("", st.session_state.final_reply, auto_copy=True)
-
             tone = st.selectbox("🎨 Adjust Tone", ["None", "Professional", "Casual", "Inspiring", "Empathetic", "Direct"], key="tone")
-
             if tone != "None" and st.button("🎯 Regenerate with Tone"):
                 from suggestor import adjust_tone
                 with st.spinner("🎨 Adjusting tone..."):
@@ -491,7 +444,6 @@ with tab1:
                             st.markdown(f"• {reason}")
             
             
-
         if st.session_state.adjusted_reply:
             st.subheader(f"🎉 Regenerated Reply ({st.session_state.tone})")
             render_polished_card("Adjusted Reply", st.session_state.adjusted_reply, auto_copy=True)
@@ -505,32 +457,25 @@ with tab1:
                     st.markdown(f"> {match.get('document', '')}")
         else:
             st.info("No relevant document matches found.")
-
         qdrant = QdrantClient(
             url=os.getenv("QDRANT_URL"),
             api_key=os.getenv("QDRANT_API_KEY")
         )
-
         if st.session_state.get("similar_examples"):
             st.subheader("🧠 Similar Past Huddle Plays Used")
             for idx, example in enumerate(st.session_state.similar_examples):
                 if not any([example.get("screenshot_text"), example.get("user_draft"), example.get("ai_reply")]):
                     continue
-
                 score = example.get("score", None)
                 boost = example.get("boost", 1.0)
                 score_label = f" (Similarity: {score:.2f}, Boost: {boost:.1f}x)" if score else ""
-
                 with st.expander(f"🔁 Past Huddle {idx + 1}"):
                     st.markdown("**🖼 Screenshot Text**")
                     st.markdown(example.get("screenshot_text") or "_Not available_")
-
                     st.markdown("**✍️ User Draft**")
                     st.markdown(example.get("user_draft") or "_Not available_")
-
                     st.markdown("**🤖 Final AI Reply**")
                     st.markdown(example.get("ai_reply") or "_Not available_")
-
                     if st.button(f"🔼 Boost This Example {idx + 1}", key=f"boost_{idx}"):
                         new_boost = boost + 1.0
                         try:
@@ -547,7 +492,7 @@ with tab1:
             # Remove all relevant session state variables
             for k in [
                 "final_reply", "adjusted_reply", "doc_matches", "screenshot_text",
-                "user_draft", "similar_examples", "last_uploaded_filename", "ocr_text"
+                "user_draft", "similar_examples", "last_uploaded_filename"
             ]:
                 if k in st.session_state:
                     del st.session_state[k]
@@ -556,30 +501,23 @@ with tab1:
             st.rerun()
         
         st.markdown("</div>", unsafe_allow_html=True)  # 🧩 Close tab1-wrapper container
-
 # ----------- Tab 2: View Documents -----------
 with tab2:
     st.markdown("### 📚 Key Documents")
     st.caption("Tap the tabs below to browse important Huddle tools.")
-
     doc_tabs = st.tabs(["One Line Bridge", "Make People Aware", "Door to Mentorship", "FAQ"])
-
     with doc_tabs[0]:
         st.markdown("## One Line Bridge")
         st.markdown("[📄 Tap here to view the OLB PDF](./public/OLB.pdf)", unsafe_allow_html=True)
-
     with doc_tabs[1]:
         st.markdown("## Make People Aware")
         st.markdown("[📄 Tap here to view the MPA PDF](./public/MPA.pdf)", unsafe_allow_html=True)
-
     with doc_tabs[2]:
         st.markdown("## Door to Mentorship")
         st.markdown("[📄 Tap here to view the DTM PDF](./public/DTM.pdf)", unsafe_allow_html=True)
-
     with doc_tabs[3]:
         st.markdown("## FAQ")
         st.markdown("[📄 Tap here to view the FAQ PDF](./public/FAQ.pdf)", unsafe_allow_html=True)
-
 # ----------- Tab 3: Past Interactions -----------
 with tab3:
     st.subheader("📖 Past Huddle Interactions")
@@ -592,13 +530,10 @@ with tab3:
             with st.expander(f"Huddle {len(huddles) - idx}: {huddle['timestamp']}"):
                 st.markdown("**🖼 Screenshot Text**")
                 st.write(huddle['screenshot_text'])
-
                 st.markdown("**📝 User Draft**")
                 st.write(huddle['user_draft'])
-
                 st.markdown("**🤖 AI Suggested Reply**")
                 st.write(huddle['ai_suggested'])
-
                 if huddle['user_final']:
                     st.markdown("**🧠 Final Edit (You)**")
                     st.write(huddle['user_final'])

@@ -16,6 +16,9 @@ import math
 from qdrant_client import QdrantClient
 from qdrant_client.models import Payload
 import streamlit_authenticator as stauth
+import pytesseract
+
+
 st.set_page_config(page_title="Test Auth", layout="centered")
 # Header block
 st.markdown("""
@@ -33,31 +36,33 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 #------------------Login--------------------------------
-PASSWORD = "test"
-def login():
-    st.title("Login Required")
-    password = st.text_input("Password", type="password")
-    login_btn = st.button("Login")
-    if login_btn:
-        if password == "test":
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("Invalid username or password.")
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-if not st.session_state["authenticated"]:
-    login()
-    st.stop()
-else:
-    st.success("You are logged in! 🎉")
-    if st.button("Logout"):
-        st.session_state["authenticated"] = False
-        st.rerun()
+# PASSWORD = "test"
+# def login():
+#     st.title("Login Required")
+#     password = st.text_input("Password", type="password")
+#     login_btn = st.button("Login")
+#     if login_btn:
+#         if password == "test":
+#             st.session_state["authenticated"] = True
+#             st.rerun()
+#         else:
+#             st.error("Invalid username or password.")
+# if "authenticated" not in st.session_state:
+#     st.session_state["authenticated"] = False
+# if not st.session_state["authenticated"]:
+#     login()
+#     st.stop()
+# else:
+#     st.success("You are logged in! 🎉")
+#     if st.button("Logout"):
+#         st.session_state["authenticated"] = False
+#         st.rerun()
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
-# Global spacing fix (helps Render match local layout)
+    
+#Global spacing fix (helps Render match local layout)
 st.markdown("""
+
 <style>
 /* Universal spacing normalizer for Render */
 section.main > div {
@@ -499,7 +504,7 @@ with tab1:
             # Increment uploader key to force file_uploader to reset
             st.session_state.uploader_key += 1
             st.rerun()
-        
+
         st.markdown("</div>", unsafe_allow_html=True)  # 🧩 Close tab1-wrapper container
 # ----------- Tab 2: View Documents -----------
 with tab2:

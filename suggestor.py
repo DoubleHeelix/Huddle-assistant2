@@ -12,46 +12,49 @@ from vectorizer import embed_batch
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Constants
-MAX_HUDDLES = 3
-MAX_DOCS = 2
-MAX_CHUNK_LEN = 500
+# ====== CONSTANTS & PROMPT ======
+
+MAX_HUDDLES = 3    # Only the most relevant huddle
+MAX_DOCS = 2       # Only the most relevant doc
+MAX_CHUNK_LEN = 400  # Further trimmed for faster/cheaper inference
 VECTOR_SIZE = 1536
 
 SYSTEM_PROMPT = (
-
-    "Your job is to help improve the user's draft reply for a chat or conversation. "
-    "Write replies that feel personal, human, and natural—never robotic or generic. "
-    "Take inspiration from the user's draft to create the best reply for the conversation in the screenshot. "
-    "Mirror the user's tone and follow the 5 Huddle principles: clarity, connection, brevity, flow, empathy."
     "You are a warm, emotionally intelligent, and concise network marketing assistant. "
-    "Speak like a real person would in a personal conversation — not like a scripted email. "
-    "Avoid generic greetings like 'Hey there', 'Hi there', or overly formal openers. "
-    "NEVER start replies with 'Draft', 'Here's a suggestion', or similar filler. "
-    "Follow the 5 Huddle principles: Clarity, Connection, Brevity, Flow, and Empathy."
+    "Write replies that feel personal, natural, and human. "
+    "Mirror the user's tone and follow the 5 Huddle principles: Clarity, Connection, Brevity, Flow, Empathy. "
+    "Avoid generic greetings (e.g., 'Hey there'), scripted language, or robotic/formal openers. "
+    "NEVER start with 'Draft:', 'Here's a suggestion', etc. "
+    "Write directly as if sending a message to the recipient in the conversation context."
 )
+
+# ====== UTILITIES ======
+
 def clean_reply(text):
     text = text.strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
-    
-
-    # Remove robotic lead-ins
-    replacements = [
+    for phrase in [
         "This is a draft", "Draft:", "Suggested reply:", "Here is your response:", "Rewritten Message:"
-    ]
-    for phrase in replacements:
+    ]:
         text = text.replace(phrase, "")
     return text.strip()
 
 def zip_qdrant_results(results):
-    return [
-        {
-            "document": r.payload.get("document", "")[:MAX_CHUNK_LEN],
-            "source": r.payload.get("source", "unknown")
-        }
-        for r in results
-    ]
+    """Zip Qdrant payloads into usable short chunks."""
+    out = []
+    seen = set()
+    for r in results:
+        doc = r.payload.get("document", "")
+        if doc and doc[:MAX_CHUNK_LEN] not in seen:
+            out.append({
+                "document": doc[:MAX_CHUNK_LEN],
+                "source": r.payload.get("source", "unknown")
+            })
+            seen.add(doc[:MAX_CHUNK_LEN])
+    return out
+
+# ====== RETRIEVAL LOGIC ======
 
 def retrieve_similar_examples(screenshot_text, user_draft):
     client = QdrantClient(
@@ -81,74 +84,75 @@ def retrieve_similar_examples(screenshot_text, user_draft):
 
     return zip_qdrant_results(huddles), zip_qdrant_results(docs)
 
+# ====== PROMPT CONSTRUCTION & SUGGESTION ======
+
 def suggest_reply(screenshot_text, user_draft, principles, model_name=None):
+    # --- Fetch context (de-duped & trimmed) ---
     huddle_matches, doc_matches = retrieve_similar_examples(screenshot_text, user_draft)
+    # Deduplicate docs if any overlap
+    seen_docs = set()
+    doc_context_lines = []
+    for m in doc_matches:
+        key = (m['source'], m['document'])
+        if key not in seen_docs:
+            doc_context_lines.append(f"📄 {m['source']}:\n{m['document']}")
+            seen_docs.add(key)
+    huddle_context_lines = []
+    for m in huddle_matches:
+        key = (m['source'], m['document'])
+        if key not in seen_docs:  # Don't repeat docs that appeared above
+            huddle_context_lines.append(f"🧠 {m['source']}:\n{m['document']}")
+            seen_docs.add(key)
 
-    def format_context(matches):
-        return "\n\n".join(
-            f"- Source: {m['source']}\n{m['document']}" for m in matches
-        )
+    # Build the prompt only with the most relevant pieces
+    prompt = (
+        f"{SYSTEM_PROMPT}\n\n"
+        "Context for reply:\n"
+        f"{' '.join(huddle_context_lines)}\n"
+        f"{' '.join(doc_context_lines)}\n\n"
+        f"Conversation context (from screenshot):\n{screenshot_text[:700]}\n\n"
+        f"User's draft reply (for inspiration):\n{user_draft[:400]}\n\n"
+        "Rewrite the best, most natural, and most human reply you would send in this scenario. "
+        "Be direct—never reference that this is a draft. Just write the message as you would send it."
+    )
 
-    huddle_context = format_context(huddle_matches)
-    doc_context = format_context(doc_matches)
-
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT
-        },
-        {
-            "role": "user",
-            "content": (
-                "Here are some relevant examples:\n\n"
-                f"🧠 Past Huddles:\n{huddle_context}\n\n"
-                f"📄 Communication Docs:\n{doc_context}\n\n"
-                "Below is the conversation context and the user's draft reply.\n"
-                "Your job is to use the draft as a starting point and rewrite it for the person in the conversation context.\n"
-                "Do NOT reply to the draft. Do NOT reference the draft. Write as if you are sending the message to the person in the screenshot context.\n\n"
-                f"Conversation context (from screenshot):\n{screenshot_text}\n\n"
-                f"User's draft reply (for inspiration):\n{user_draft}\n\n"
-                "Write the best, most natural, and most human reply you would send in this scenario."
-            )
-        }
-    ]
-
-    selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4")
+    selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4o")
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
         model=selected_model,
-        messages=messages,
-        temperature=0.7
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.6,
+        max_tokens=300
     )
-
     final_reply = clean_reply(response.choices[0].message.content)
 
-    # Determine if the huddle is high quality
+    # Quality check for saving (keep as-is)
     is_quality = (
         len(user_draft.strip().split()) >= 8 and
         len(screenshot_text.strip()) >= 20 and
         "lorem ipsum" not in screenshot_text.lower()
     )
-    
     if is_quality:
         embed_and_store_interaction(
             screenshot_text=screenshot_text,
             user_draft=user_draft,
             ai_suggested=final_reply
         )
-    
     return final_reply, doc_matches
+
+# ====== TONE ADJUSTMENT (SHORT PROMPT, ONLY THE REPLY) ======
 
 def adjust_tone(original_reply, selected_tone):
     if not selected_tone or selected_tone == "None":
         return original_reply
 
-    prompt = f"""
-Take the following message and rewrite it to sound more {selected_tone.lower()}, while still sounding like a human having a natural conversation.
-
-Message:
-{original_reply}
-"""
+    prompt = (
+        f"Rewrite this message in a more {selected_tone.lower()} tone, while still sounding like a human having a natural conversation. "
+        f"\n\nMessage:\n{original_reply[:600]}"
+    )
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
@@ -157,7 +161,7 @@ Message:
             {"role": "system", "content": "You are an expert at rephrasing text to match a conversational tone with emotional intelligence."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.7
+        temperature=0.7,
+        max_tokens=300
     )
-
     return clean_reply(response.choices[0].message.content)

@@ -6,7 +6,7 @@ from ocr import extract_text_from_image
 import tempfile
 import base64
 from PIL import Image
-from doc_embedder import embed_documents
+from doc_embedder import embed_documents_parallel
 from notion_embedder import embed_huddles_qdrant
 import os
 from openai import OpenAI
@@ -182,24 +182,36 @@ def render_polished_card(label, text, auto_copy=False):
     """
     components.html(full_html, height=fixed_height + 70, scrolling=True)
 # ----------- Sidebar -----------
+PDF_DIR = "public"
+COLLECTION_NAME = "docs_memory"
+VECTOR_SIZE = 1536  # or whatever matches your vectorizer
+
 with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
-    min_words = st.slider("Minimum words in draft", 5, 20, 8)
-    min_chars = st.slider("Minimum characters in screenshot text", 10, 100, 20)
-    require_question = st.checkbox("Require a question in the draft?", value=False)
+    min_words = st.slider("Minimum words in draft", 5, 20, 8, help="Minimum word count required for draft to be saved.")
+    min_chars = st.slider("Minimum characters in screenshot text", 10, 100, 20, help="Minimum length of extracted screenshot text.")
+    require_question = st.checkbox("Require a question in the draft?", value=False, help="Draft must include at least one question.")
+
 with st.sidebar.expander("⚙️ Admin Controls", expanded=False):
-    st.markdown("Use these to manually refresh AI memory.")
-    model_choice = st.sidebar.radio(
+    st.markdown("#### AI Memory & Model Settings")
+    model_choice = st.radio(
         "🤖 Choose AI Model",
         options=["gpt-4o", "gpt-3.5-turbo"],
-        help="Use GPT-3.5 for faster, cheaper replies. GPT-4 is better for nuance and accuracy."
+        help="GPT-4o: best quality, GPT-3.5: fastest/cheapest"
     )
-    
-    if st.button("📚 Re-embed Communication Docs"):
-        embed_documents()
-        st.success("✅ Docs embedded successfully.")
-    if st.button("🧠 Re-sync Notion Huddles"):
-        embed_huddles_qdrant()
-        st.success("✅ Notion memory embedded successfully.")
+    st.markdown("---")
+    # --- Communication Docs Embedding ---
+    embed_col, notion_col = st.columns(2)
+    with embed_col:
+        if st.button("📚 Re-embed Docs"):
+            with st.spinner("Embedding communication docs..."):
+                embed_documents_parallel(PDF_DIR,COLLECTION_NAME,VECTOR_SIZE)
+            st.success("✅ Docs embedded successfully!")
+    with notion_col:
+        if st.button("🧠 Re-sync Notion"):
+            with st.spinner("Syncing Notion huddles..."):
+                embed_huddles_qdrant()
+            st.success("✅ Notion memory embedded successfully!")
+
 # ----------- Main App Tabs -----------
 st.markdown("""
 <style>

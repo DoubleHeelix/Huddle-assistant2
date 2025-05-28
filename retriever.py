@@ -1,26 +1,37 @@
-from sentence_transformers import SentenceTransformer, util
+import openai
 import pandas as pd
+import numpy as np
 import os
 
-model = SentenceTransformer("paraphrase-MiniLM-L3-v2")  # Light + fast
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure this is set in your environment
+
+def get_embedding(text):
+    response = openai.Embedding.create(
+        input=text,
+        model="text-embedding-ada-002"
+    )
+    return response['data'][0]['embedding']
+
+def cosine_similarity(vec1, vec2):
+    vec1 = np.array(vec1)
+    vec2 = np.array(vec2)
+    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 def retrieve_similar_human_edit(new_text, csv_path="tone_training_log.csv", top_k=1):
     if not os.path.exists(csv_path):
         return None, None
 
     df = pd.read_csv(csv_path, names=["text", "image_url", "tone", "ai_message", "human_message"])
-    texts = df["text"].fillna("").tolist()
-    human_messages = df["human_message"].fillna("").tolist()
+    df["text"] = df["text"].fillna("")
+    df["human_message"] = df["human_message"].fillna("")
 
-    if not texts:
+    if df.empty:
         return None, None
 
-    query_embedding = model.encode(new_text, convert_to_tensor=True)
-    corpus_embeddings = model.encode(texts, convert_to_tensor=True)
+    query_embedding = get_embedding(new_text)
+    corpus_embeddings = df["text"].apply(get_embedding).tolist()
 
-    hits = util.semantic_search(query_embedding, corpus_embeddings, top_k=top_k)[0]
+    similarities = [cosine_similarity(query_embedding, emb) for emb in corpus_embeddings]
+    top_idx = int(np.argmax(similarities))
 
-    if hits:
-        index = hits[0]["corpus_id"]
-        return texts[index], human_messages[index]
-    return None, None
+    return df.iloc[top_idx]["text"], df.iloc[top_idx]["human_message"]

@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer, util
 import pandas as pd
 import os
 
-model = SentenceTransformer("all-MiniLM-L6-v2")  # Light + fast
+model = SentenceTransformer("paraphrase-MiniLM-L3-v2")  # Light + fast
 
 def retrieve_similar_human_edit(new_text, csv_path="tone_training_log.csv", top_k=1):
     if not os.path.exists(csv_path):

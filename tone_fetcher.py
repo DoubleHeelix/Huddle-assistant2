@@ -1,28 +1,35 @@
-from qdrant_client import QdrantClient
-from qdrant_client.models import Filter, FieldCondition, MatchValue, SearchRequest
-from sentence_transformers import SentenceTransformer
 import os
+from uuid import uuid4
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Filter, FieldCondition, MatchValue,
+    PointStruct, VectorParams, Distance
+)
 from notion_client import Client
+from vectorizer import embed_batch
 
+# ✅ Lazy-load SentenceTransformer to avoid Streamlit/Torch reload issues
+def get_model():
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
+# ✅ Qdrant and Notion setup
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
     api_key=os.getenv("QDRANT_API_KEY")
 )
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
 collection_name = "tone_training_memory"
 
 notion = Client(auth=os.getenv("NOTION_API_KEY"))
 TONE_TRAINING_DB = os.getenv("NOTION_TONE_DB_ID")
 
+# ✅ Fetch tone training examples from Notion
 def fetch_tone_training_examples():
     pages = notion.databases.query(database_id=TONE_TRAINING_DB)["results"]
 
     examples = []
     for page in pages:
         props = page["properties"]
-
         examples.append({
             "id": page["id"],
             "text": props["Story Text"]["title"][0]["plain_text"] if props["Story Text"]["title"] else "",
@@ -31,15 +38,13 @@ def fetch_tone_training_examples():
             "ai_message": props["AI Message"]["rich_text"][0]["plain_text"] if props["AI Message"]["rich_text"] else "",
             "last_edited": page["last_edited_time"]
         })
-
     return examples
 
-
+# ✅ Retrieve most similar tone-matching entry from Qdrant
 def retrieve_similar_tone_example(query_text, tone, top_k=1):
-    # Embed query
+    model = get_model()
     query_vector = model.encode(f"{query_text} — {tone}").tolist()
 
-    # Filter by tone (if present in the payloads)
     search_filter = Filter(
         must=[FieldCondition(key="tone", match=MatchValue(value=tone))]
     )
@@ -52,40 +57,21 @@ def retrieve_similar_tone_example(query_text, tone, top_k=1):
             query_filter=search_filter,
             with_payload=True
         )
-
         if results:
             best = results[0].payload
             return best.get("your_message"), best.get("tone")
     except Exception as e:
         print(f"⚠️ Retrieval failed: {e}")
-
     return None, None
 
+# ✅ Embed and upload tone training examples to Qdrant
 def embed_tone_training_qdrant():
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import (
-        PointStruct, VectorParams, Distance,
-        Filter, FieldCondition, MatchValue
-    )
-    from vectorizer import embed_batch
-    from uuid import uuid4
-    import os
-    from tone_fetcher import fetch_tone_training_examples
-
-    client = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY")
-    )
-
-    collection_name = "tone_training_memory"
-    VECTOR_SIZE = 1536
-
     try:
         client.get_collection(collection_name)
     except:
         client.recreate_collection(
             collection_name=collection_name,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
         )
         client.create_payload_index(
             collection_name=collection_name,
@@ -102,9 +88,7 @@ def embed_tone_training_qdrant():
             existing = client.scroll(
                 collection_name=collection_name,
                 scroll_filter=Filter(
-                    must=[
-                        FieldCondition(key="page_id", match=MatchValue(value=ex["id"]))
-                    ]
+                    must=[FieldCondition(key="page_id", match=MatchValue(value=ex["id"]))]
                 ),
                 limit=1
             )
@@ -113,18 +97,15 @@ def embed_tone_training_qdrant():
             print(f"⚠️ Scroll failed for tone entry {ex['id']}: {e}")
             existing_payload = None
 
-        if (
-            not existing_payload or
-            existing_payload.get("last_edited") != ex["last_edited"]
-        ):
+        if not existing_payload or existing_payload.get("last_edited") != ex["last_edited"]:
             to_embed.append(ex)
 
-    print(f"🧠 {len(to_embed)} new or updated tone entries to embed")
+    print(f"🧐 {len(to_embed)} new or updated tone entries to embed")
 
     batch_size = 20
     for i in range(0, len(to_embed), batch_size):
         batch = to_embed[i:i+batch_size]
-        texts = [f"{ex['text']} — {ex['tone']}" for ex in batch]  # include tone for retrieval context
+        texts = [f"{ex['text']} — {ex['tone']}" for ex in batch]
         vectors = embed_batch(texts)
 
         points = [

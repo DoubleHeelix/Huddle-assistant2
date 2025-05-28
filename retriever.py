@@ -1,8 +1,10 @@
-from sentence_transformers import SentenceTransformer, util
-import pandas as pd
 import os
+import pandas as pd
+from sentence_transformers import SentenceTransformer, util
 
-model = SentenceTransformer("all-MiniLM-L6-v2")  # Light + fast
+# ✅ Load model inside a function to avoid Streamlit file-watcher issues
+def get_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 def retrieve_similar_human_edit(new_text, csv_path="tone_training_log.csv", top_k=1):
     if not os.path.exists(csv_path):
@@ -15,6 +17,7 @@ def retrieve_similar_human_edit(new_text, csv_path="tone_training_log.csv", top_
     if not texts:
         return None, None
 
+    model = get_model()
     query_embedding = model.encode(new_text, convert_to_tensor=True)
     corpus_embeddings = model.encode(texts, convert_to_tensor=True)
 
@@ -23,4 +26,5 @@ def retrieve_similar_human_edit(new_text, csv_path="tone_training_log.csv", top_
     if hits:
         index = hits[0]["corpus_id"]
         return texts[index], human_messages[index]
+
     return None, None

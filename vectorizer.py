@@ -2,7 +2,7 @@ import openai
 import os
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
+#======may need to remove?
 def embed_batch(texts, model="text-embedding-3-small"):
     response = openai.embeddings.create(
         model=model,

@@ -14,7 +14,7 @@ import openai
 import base64
 from html import escape
 
-# === Internal imports ===
+# === Internal imports ====
 from memory import save_huddle_to_notion, load_all_interactions
 from memory_vector import embed_and_store_interaction, retrieve_similar_examples # For displaying similar examples
 # Updated imports from suggestor.py

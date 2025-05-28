@@ -21,7 +21,7 @@ except Exception as e:
     print(f"Critical Error initializing OpenAI client: {e}. Suggestor functions will not work.")
     client = None
 
-# ====== CONSTANTS ======
+# ====== CONSTANTS =======
 MAX_HUDDLES_CONTEXT = 3 
 MAX_DOCS_CONTEXT = 2    
 MAX_CHUNK_LEN_CONTEXT = 400 

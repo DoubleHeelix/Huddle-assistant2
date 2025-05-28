@@ -37,7 +37,7 @@ jsonschema==4.23.0
 jsonschema-specifications==2025.4.1
 MarkupSafe==3.0.2
 notion-client==2.3.0
-numpy==2.2.6
+numpy==1.26.4
 oauthlib==3.2.2
 openai==1.81.0
 packaging==24.2

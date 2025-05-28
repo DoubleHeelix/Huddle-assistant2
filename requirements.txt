@@ -78,7 +78,7 @@ pydeck==0.9.1
 Pygments==2.19.1
 PyMuPDF==1.25.5
 PyPika==0.48.9
-pip install google-cloud-vision
+google-cloud-vision
 pyproject_hooks==1.2.0
 pytesseract==0.3.13
 python-dateutil==2.9.0.post0

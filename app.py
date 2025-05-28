@@ -213,7 +213,8 @@ with tab1:
         for key, default_value in session_keys.items():
             if key not in st.session_state:
                 st.session_state[key] = default_value
-        
+        if "user_draft_widget_key" not in st.session_state:
+                    st.session_state.user_draft_widget_key = "user_draft_initial" # Initial key
         if "scroll_to_draft" not in st.session_state:
             st.session_state.scroll_to_draft = False
         if "last_uploaded_filename" not in st.session_state:
@@ -259,7 +260,8 @@ with tab1:
         st.session_state.user_draft_current = st.text_area(
             "Your Draft Message", 
             value=st.session_state.user_draft_current,
-            label_visibility="collapsed", height=110, key="user_draft_widget"
+            label_visibility="collapsed", height=110, 
+            key=st.session_state.user_draft_widget_key # Use the dynamic key
         )
         
         # ---- Generate AI Reply ----
@@ -514,25 +516,28 @@ with tab1:
 
 
         if st.button("➕ Start New Huddle", key="new_huddle_button_tab1"):
-            # Clear all relevant session state keys
-            keys_to_clear_on_new = [
-                "final_reply_collected", "adjusted_reply_collected", 
-                "doc_matches_for_display", "screenshot_text_content", 
-                "user_draft_current", "similar_examples_retrieved",
-                "last_uploaded_filename", "current_tone_selection",
-                "tone_selectbox_key" # Reset selectbox by clearing its state too
-            ] 
-            for k_clear in keys_to_clear_on_new:
-                if k_clear in st.session_state:
-                    # Reset to initial defaults if defined, otherwise delete
-                    if k_clear in session_keys:
-                         st.session_state[k_clear] = session_keys[k_clear]
-                    else:
-                         del st.session_state[k_clear]
-            
-            st.session_state.uploader_key += 1 # Resets file uploader
-            st.session_state.user_draft_current = "" # Explicitly clear text area content
-            st.rerun()
+                    # Clear all relevant session state keys
+                    keys_to_clear_on_new = [
+                        "final_reply_collected", "adjusted_reply_collected", 
+                        "doc_matches_for_display", "screenshot_text_content", 
+                        "user_draft_current", "similar_examples_retrieved",
+                        "last_uploaded_filename", "current_tone_selection",
+                        "tone_selectbox_key" 
+                    ] 
+                    for k_clear in keys_to_clear_on_new:
+                        if k_clear in st.session_state:
+                            if k_clear in session_keys:
+                                 st.session_state[k_clear] = session_keys[k_clear]
+                            else:
+                                 del st.session_state[k_clear]
+                    
+                    st.session_state.uploader_key += 1 
+                    st.session_state.user_draft_current = "" 
+                    
+                    # ADD THIS: Change the key for the text_area to force a full reset
+                    st.session_state.user_draft_widget_key = f"user_draft_{uuid.uuid4().hex[:6]}" # Generate a new unique key
+                    
+                    st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)  # End tab1-wrapper
 
 # =============== TAB 2: VIEW DOCUMENTS ===============

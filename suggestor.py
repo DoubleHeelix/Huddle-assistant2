@@ -32,13 +32,20 @@ HUDDLE_MEMORY_COLLECTION = "huddle_memory"
 DOCS_MEMORY_COLLECTION = "docs_memory"
 
 SYSTEM_PROMPT = (
-    "You are a warm, emotionally intelligent, and concise network marketing assistant. "
-    "Write replies that feel personal, natural, and human. "
-    "Mirror the user's tone and follow the 5 Huddle principles: Clarity, Connection, Brevity, Flow, Empathy. "
-    "Avoid generic greetings (e.g., 'Hey there'), scripted language, or robotic/formal openers. "
-    "NEVER start with 'Draft:', 'Here's a suggestion', etc. "
-    "Write directly as if sending a message to the recipient in the conversation context."
+    "You are a warm, emotionally intelligent, and concise assistant trained for network marketing conversations. "
+    "Your replies should sound human, personal, and naturally flowing—never robotic, scripted, or overly formal. "
+    "Speak as a trusted peer, aiming to build real connection while subtly exploring whether the recipient is open to something outside their current work—like extra income or new challenges.\n\n"
+
+    "KEY GUIDELINES:\n"
+    "1. CONTEXT-FIRST: Carefully read both the screenshot and user's draft. Your message should naturally continue the conversation, not just rephrase the draft—refine it with clarity and direction.\n"
+    "2. KEEP CONVO GOING: If the draft lacks a question or forward motion, add a natural, open-ended question based on the flow or recipient’s situation to invite response.\n"
+    "3. TONE MATCHING: Reflect the recipient’s tone—casual, curious, upbeat, etc.—while staying warm, curious, and non-salesy.\n"
+    "4. SOFT OPPORTUNITY FRAMING: The goal is to gently explore if they’re open to new ideas or income streams. Don’t pitch. Focus on curiosity, values, or current priorities.\n"
+    "5. AVOID CLICHÉS: Never use terms like 'financial freedom,' 'passive income,' 'amazing opportunity,' or 'mentorship.' Use grounded, relatable language.\n"
+    "6. FOLLOW HUDDLE PRINCIPLES: Clarity, Connection, Brevity, Flow, Empathy.\n"
+    "7. NO PREFACES: Never start with 'Draft:' or 'Here's a suggestion.' Just write the reply as if you're sending it directly."
 )
+
 
 # ====== UTILITIES ======
 
@@ -204,8 +211,6 @@ def generate_suggested_reply(screenshot_text, user_draft, principles, model_name
             "Be creative, offer a fresh perspective, and ensure this new suggestion is distinct from any previous ones for this exact request."
         )
         current_temperature = 0.75 # Slightly higher temperature for more varied regeneration
-    model_identifier = "gemini-2.5-pro-preview-05-06" # Or whichever you choose
-    model = genai.GenerativeModel(model_identifier)
     selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4o")
     
     try:
@@ -281,114 +286,3 @@ def generate_adjusted_tone(original_reply, selected_tone, model_name=None):
         error_message = f"Unexpected error adjusting tone: {e}"
         print(error_message)
         return original_reply
-
-
-# ====== STREAMING SUGGESTION (Commented Out - Kept for reference) ======
-# def stream_suggested_reply(screenshot_text, user_draft, principles, model_name, huddle_context_str, doc_context_str):
-#     """
-#     Generates an AI reply suggestion as a stream.
-#     """
-#     if not client:
-#         yield "Error: OpenAI client not initialized. Please check API key and ensure `suggestor.py` initialized correctly."
-#         return
-# 
-#     truncated_screenshot = screenshot_text[:1200] 
-#     truncated_draft = user_draft[:600]        
-# 
-#     user_prompt_content = (
-#         f"KEY PRINCIPLES FOR YOUR REPLY (Strictly Follow These):\n{principles}\n\n"
-#         "CONTEXT FROM SIMILAR PAST HUDDLES:\n"
-#         f"{huddle_context_str}\n\n" 
-#         "CONTEXT FROM RELEVANT DOCUMENTS:\n"
-#         f"{doc_context_str}\n\n"     
-#         "CURRENT CONVERSATION (FROM SCREENSHOT):\n"
-#         f"{truncated_screenshot}\n\n"
-#         "USER'S DRAFT IDEA (Use for inspiration on topic/intent. Improve it based on principles and context. Do NOT just rephrase the draft if it's weak or misses the mark.):\n"
-#         f"{truncated_draft}\n\n"
-#         "YOUR TASK:\n"
-#         "Craft the best, most natural, and human reply for this scenario. "
-#         "Adhere strictly to the system prompt and the key principles. "
-#         "Be direct—do not reference that this is a draft or a suggestion. "
-#         "Write the message exactly as if you were sending it to the person in the conversation."
-#     )
-# 
-#     selected_model = model_name or os.getenv("OPENAI_MODEL", "gpt-4o")
-#     
-#     try:
-#         response_stream = client.chat.completions.create(
-#             model=selected_model,
-#             messages=[
-#                 {"role": "system", "content": SYSTEM_PROMPT},
-#                 {"role": "user", "content": user_prompt_content}
-#             ],
-#             temperature=0.65, 
-#             max_tokens=400,  
-#             stream=True
-#         )
-#         for chunk in response_stream:
-#             if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-#                 yield chunk.choices[0].delta.content
-#     except openai.APIError as e: 
-#         error_message = f"OpenAI API Error generating suggestion: {e}"
-#         print(error_message)
-#         yield error_message
-#     except Exception as e:
-#         error_message = f"Unexpected error generating suggestion: {e}"
-#         print(error_message)
-#         yield error_message
-
-
-# ====== STREAMING TONE ADJUSTMENT (Commented Out - Kept for reference) ======
-# def stream_adjusted_tone(original_reply, selected_tone, model_name=None):
-#     """
-#     Adjusts the tone of the original reply as a stream.
-#     """
-#     if not client:
-#         yield "Error: OpenAI client not initialized. Please check API key and ensure `suggestor.py` initialized correctly."
-#         return
-#         
-#     if not selected_tone or selected_tone.lower() == "none":
-#         yield original_reply 
-#         return
-# 
-#     truncated_original_reply = original_reply[:1000] 
-# 
-#     tone_system_prompt = (
-#         "You are an expert at rephrasing text to match a specific conversational tone with emotional intelligence. "
-#         "Preserve the core message, intent, and key information of the original text. "
-#         "Focus on changing the delivery and feel, not the substance, unless the tone itself implies a necessary shift (e.g. 'more direct' might shorten it). "
-#         "Avoid making the message sound overly artificial or losing its natural conversational flow. "
-#         "Do NOT add any preamble like 'Okay, here's the version in a ... tone'. Just provide the rephrased message directly."
-#     )
-#     
-#     tone_user_prompt = (
-#         f"Please rewrite the following message in a more {selected_tone.lower()} tone. "
-#         "Ensure it remains natural, human, and suitable for a direct conversation. "
-#         f"The message should still be concise and clear, reflecting the requested tone.\n\n"
-#         f"Original Message to rephrase:\n\"\"\"\n{truncated_original_reply}\n\"\"\""
-#     )
-# 
-#     selected_model_for_tone = model_name or os.getenv("OPENAI_MODEL_TONE", os.getenv("OPENAI_MODEL", "gpt-4o"))
-# 
-#     try:
-#         response_stream = client.chat.completions.create(
-#             model=selected_model_for_tone,
-#             messages=[
-#                 {"role": "system", "content": tone_system_prompt},
-#                 {"role": "user", "content": tone_user_prompt}
-#             ],
-#             temperature=0.7, 
-#             max_tokens=400,  
-#             stream=True
-#         )
-#         for chunk in response_stream:
-#             if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-#                 yield chunk.choices[0].delta.content
-#     except openai.APIError as e: 
-#         error_message = f"OpenAI API Error adjusting tone: {e}"
-#         print(error_message)
-#         yield error_message
-#     except Exception as e:
-#         error_message = f"Unexpected error adjusting tone: {e}"
-#         print(error_message)
-#         yield error_message

@@ -317,7 +317,13 @@ with tab1:
                         st.session_state.user_draft_current
                     )
                     st.session_state.doc_matches_for_display = doc_matches_disp
-                    principles_to_use = '''1. Be clear and confident. 2. Ask questions, don’t convince. 3. Use connection > persuasion. 4. Keep it short, warm, and human. 5. Stick to the Huddle flow and tone.'''
+                    principles_to_use = '''
+                    1.  **Clarity & Impact:** Is the core message instantly understandable and engaging?
+                    2.  **Curiosity, Not Persuasion:** Does the reply invite dialogue with genuine questions rather than trying to sell or convince?
+                    3.  **Build Rapport:** Does it strengthen the connection with the recipient, reflecting empathy and understanding?
+                    4.  **Concise & Authentic:** Is it brief, warm, and does it sound like a real person, not a script?
+                    5.  **Strategic Next Step:** Does it naturally guide the conversation towards understanding their needs or openness, in line with the Huddle flow?
+                    '''
                     st.session_state.huddle_context_for_regen = huddle_ctx_to_use
                     st.session_state.doc_context_for_regen = doc_ctx_to_use
                     st.session_state.principles_for_regen = principles_to_use

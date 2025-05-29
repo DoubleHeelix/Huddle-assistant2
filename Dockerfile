@@ -25,4 +25,5 @@ RUN pip install -r requirements.txt
 EXPOSE 8501
 
 # Run memory sync in background (optional) and launch app
-CMD ["sh", "-c", "python memory_sync.py || true & streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false"]
+CMD ["python", "entrypoint.py"]
+

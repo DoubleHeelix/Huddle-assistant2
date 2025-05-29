@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from openai import OpenAI
 import openai
 import base64
-from html import escape
+import html
 
 # === Internal imports ====
 from memory import save_huddle_to_notion, load_all_interactions
@@ -137,76 +137,121 @@ def analyze_visual_and_generate_message(image):
     )
     return response.choices[0].message.content
 
-# ---- Polished Card Renderer ----
-def render_polished_card(label, text_content, auto_copy=True):
-    def format_text_html(text):
-        cleaned = str(text).strip()
-        normalized = re.sub(r"\n{2,}", "\n\n", cleaned)
-        html_ready = normalized.replace('\n', '<br>')
-        return re.sub(r"^(<br\s*/?>\s*)+", "", html_ready, flags=re.IGNORECASE)
+import streamlit as st
+import re
+import uuid
+from html import escape # For displaying HTML safely
+import streamlit.components.v1 as components # For reliable script execution
 
-    safe_html_text = format_text_html(text_content)
-    
-    copy_button_html = f"""
-        <button onclick="navigator.clipboard.writeText(`{escape(text_content)}`)"
-                style="float: right; background: #444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+def render_polished_card(label, text_content, auto_copy=False): # auto_copy is not used in this version, but kept for signature
+    # 1. Prepare text for safe HTML display
+    def format_text_html(text):
+        cleaned_text = str(text).strip()
+        normalized = re.sub(r"\n{2,}", "\n\n", cleaned_text)
+        html_ready = normalized.replace('\n', '<br>')
+        return re.sub(r"^(<br\s*/?>\s*)+", "", html_ready, flags=re.IGNORECASE | re.MULTILINE)
+
+    safe_html_text_for_display = format_text_html(text_content)
+
+    # 2. Prepare text for JavaScript clipboard (escape for JS string literals)
+    # Crucially, do this on the raw text_content, NOT on html.escaped text.
+    js_escaped_text_for_clipboard = str(text_content).replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"').replace("\n", "\\n")
+
+    # 3. Generate unique IDs
+    card_instance_id = uuid.uuid4().hex[:8]
+    unique_button_id = f"copy_btn_{card_instance_id}"
+    unique_alert_id = f"copy_alert_{card_instance_id}"
+
+    # 4. HTML for the button and alert (no inline JS for onclick)
+    copy_button_html_structure = f"""
+        <button id="{unique_button_id}"
+                title="Copy to clipboard"
+                style="float: right; background: #444; color: white; border: none; 
+                       padding: 6px 10px; border-radius: 6px; cursor: pointer;
+                       font-size: 14px; line-height: 1;">
             📋 Copy
         </button>
-    """ if auto_copy else ""
+        <span id="{unique_alert_id}" 
+              style="display:none; float: right; margin-right: 8px; color: #90ee90; 
+                     font-size: 13px; line-height: 1; padding-top: 7px;">
+            Copied!
+        </span>
+    """
 
+    # 5. Main card HTML structure
     st.markdown(f"""
     <style>
-    .fade-in {{
-        animation: fadeIn 1s ease-out forwards;
-        opacity: 0;
+    .card-header-h4 {{
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }}
-    @keyframes fadeIn {{
-        from {{ opacity: 0; transform: translateY(8px); }}
-        to {{ opacity: 1; transform: translateY(0); }}
-    }}
+    .card-header-h4 > span:first-of-type {{ margin-right: auto; }}
+    .card-header-h4 > div.button-container {{ display: flex; align-items: center; }}
     </style>
 
-    <div class="fade-in" style="border-radius: 16px; padding: 20px; background-color: #1e1e1e; color: white; font-size: 16px; line-height: 1.6; box-shadow: 0 0 8px rgba(255,255,255,0.05);">
-        <h4 style="margin-bottom: 12px;">✉️ {label} {copy_button_html}</h4>
-        <div>{safe_html_text}</div>
+    <div style="border-radius: 16px; padding: 20px; background-color: #1e1e1e; color: white; font-size: 16px; line-height: 1.6; box-shadow: 0 0 8px rgba(255,255,255,0.05);">
+        <div class="card-header-h4">
+            <span>✉️ {label}</span>
+            <div class="button-container">{copy_button_html_structure}</div>
+        </div>
+        <div style="clear: both;"></div>
+        <div>{safe_html_text_for_display}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    unique_id = uuid.uuid4().hex[:8]
-    # Escape text for safe embedding in JavaScript strings for the copy functionality
-    js_escaped_text = str(text_content).replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"').replace("\n", "\\n")
-    
-    html_formatted_text_for_display = format_text_html(text_content) # Use the refined formatter
-    
-    fixed_height = 400 # Desired fixed height for the text display area
-    
-    auto_copy_script = ""
-    if auto_copy:
-        auto_copy_script = f"""
-        <script>
-            (function() {{ // IIFE to avoid polluting global scope
-                const textToCopy = `{js_escaped_text}`;
-                navigator.clipboard.writeText(textToCopy).then(() => {{
-                    const alertBox = document.getElementById('copyAlert-{unique_id}');
-                    if (alertBox) {{
+    # 6. JavaScript for functionality, run via components.html
+    script_to_run = f"""
+    <script>
+    (function() {{ // IIFE
+        const textToCopy = `{js_escaped_text_for_clipboard}`; // Use the JS-escaped version
+        const copyButton = window.parent.document.getElementById('{unique_button_id}');
+        const alertBox = window.parent.document.getElementById('{unique_alert_id}');
+
+        if (copyButton && alertBox) {{
+            copyButton.onclick = function() {{
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {{
+                    navigator.clipboard.writeText(textToCopy).then(() => {{
+                        alertBox.textContent = 'Copied!';
+                        alertBox.style.color = '#90ee90';
                         alertBox.style.display = 'inline-block';
                         setTimeout(() => {{ alertBox.style.display = 'none'; }}, 1500);
-                    }}
-                }}).catch(err => console.error('Auto-copy failed: ', err));
-            }})();
-        </script>
-        """
-
-    copy_button_onclick_js = f"""
-        const textToCopy = `{js_escaped_text}`;
-        navigator.clipboard.writeText(textToCopy).then(() => {{
-            const alertBox = document.getElementById('copyAlert-{unique_id}');
-            if (alertBox) {{
-                alertBox.style.display = 'inline-block';
-                setTimeout(() => {{ alertBox.style.display = 'none'; }}, 1500);
-            }}
-        }}).catch(err => console.error('Manual copy failed: ', err));
+                        console.log('Text copied (button click)');
+                    }}).catch(err => {{
+                        console.error('Copy failed: ', err);
+                        alertBox.textContent = 'Error!';
+                        alertBox.style.color = 'red';
+                        alertBox.style.display = 'inline-block';
+                        setTimeout(() => {{ alertBox.style.display = 'none'; }}, 2000);
+                    }});
+                }} else {{
+                    console.warn('Clipboard API not available. Fallback copy method might be needed if essential.');
+                    // Fallback window.prompt is generally not recommended
+                    // window.prompt("Copy to clipboard: Ctrl+C, Enter", textToCopy); 
+                    alertBox.textContent = 'Copy API N/A';
+                    alertBox.style.color = 'orange';
+                    alertBox.style.display = 'inline-block';
+                    setTimeout(() => {{ alertBox.style.display = 'none'; }}, 2000);
+                }}
+            }};
+        }} else {{
+            if (!copyButton) console.error('Copy button ID {unique_button_id} not found.');
+            if (!alertBox) console.error('Alert box ID {unique_alert_id} not found.');
+        }}
+        
+        // If you re-introduce auto_copy logic:
+        // if ({str(auto_copy).lower()}) {{
+        //     if (navigator && navigator.clipboard && navigator.clipboard.writeText) {{
+        //         navigator.clipboard.writeText(textToCopy).then(() => {{
+        //             console.log('Text auto-copied');
+        //         }}).catch(err => console.error('Auto-copy failed: ', err));
+        //     }}
+        // }}
+    }})();
+    </script>
     """
+    components.html(script_to_run, height=0)
 
 # ---- Main Tabs ----
 tab1, tab2, tab3 = st.tabs(["Huddle Play", "Interruptions", "📚 View Past Huddles"])

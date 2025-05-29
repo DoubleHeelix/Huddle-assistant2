@@ -13,6 +13,7 @@ from openai import OpenAI
 import openai
 import base64
 import html
+from notion_client import Client
 
 # === Internal imports ====
 from memory import save_huddle_to_notion, load_all_interactions
@@ -143,26 +144,28 @@ import uuid
 from html import escape # For displaying HTML safely
 import streamlit.components.v1 as components # For reliable script execution
 
-def render_polished_card(label, text_content, auto_copy=False): # auto_copy is not used in this version, but kept for signature
+def render_polished_card(label, text_content, auto_copy=True): # Default auto_copy to True
     # 1. Prepare text for safe HTML display
-    def format_text_html(text):
-        cleaned_text = str(text).strip()
+    def format_text_html(text_to_format): # Renamed internal variable for clarity
+        cleaned_text = str(text_to_format).strip()
         normalized = re.sub(r"\n{2,}", "\n\n", cleaned_text)
         html_ready = normalized.replace('\n', '<br>')
         return re.sub(r"^(<br\s*/?>\s*)+", "", html_ready, flags=re.IGNORECASE | re.MULTILINE)
 
     safe_html_text_for_display = format_text_html(text_content)
 
-    # 2. Prepare text for JavaScript clipboard (escape for JS string literals)
-    # Crucially, do this on the raw text_content, NOT on html.escaped text.
-    js_escaped_text_for_clipboard = str(text_content).replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"').replace("\n", "\\n")
+    # 2. Prepare text for JavaScript clipboard
+    js_escaped_text_for_clipboard = str(text_content).replace("\\", "\\\\") \
+                                                     .replace("`", "\\`") \
+                                                     .replace('"', '\\"') \
+                                                     .replace("\n", "\\n")
 
     # 3. Generate unique IDs
     card_instance_id = uuid.uuid4().hex[:8]
     unique_button_id = f"copy_btn_{card_instance_id}"
     unique_alert_id = f"copy_alert_{card_instance_id}"
 
-    # 4. HTML for the button and alert (no inline JS for onclick)
+    # 4. HTML for the button and alert
     copy_button_html_structure = f"""
         <button id="{unique_button_id}"
                 title="Copy to clipboard"
@@ -205,9 +208,45 @@ def render_polished_card(label, text_content, auto_copy=False): # auto_copy is n
     script_to_run = f"""
     <script>
     (function() {{ // IIFE
-        const textToCopy = `{js_escaped_text_for_clipboard}`; // Use the JS-escaped version
+        const textToCopy = `{js_escaped_text_for_clipboard}`;
         const copyButton = window.parent.document.getElementById('{unique_button_id}');
         const alertBox = window.parent.document.getElementById('{unique_alert_id}');
+
+        function fallbackCopyTextToClipboard(text) {{
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = text;
+            tempTextArea.style.position = 'absolute';
+            tempTextArea.style.left = '-9999px';
+            tempTextArea.style.top = '0';
+            
+            const doc = window.parent.document || document;
+            doc.body.appendChild(tempTextArea);
+            
+            tempTextArea.focus();
+            tempTextArea.select();
+
+            let success = false;
+            try {{
+                success = doc.execCommand('copy');
+                if (success) {{
+                    alertBox.textContent = 'Copied!';
+                    alertBox.style.color = '#90ee90';
+                    console.log('Text copied via fallback (execCommand)');
+                }} else {{
+                    alertBox.textContent = 'Copy Failed';
+                    alertBox.style.color = 'orange';
+                    console.error('Fallback copy using execCommand failed (returned false).');
+                }}
+            }} catch (err) {{
+                alertBox.textContent = 'Copy Error!';
+                alertBox.style.color = 'red';
+                console.error('Error during fallback copy using execCommand:', err);
+            }}
+
+            alertBox.style.display = 'inline-block';
+            setTimeout(() => {{ alertBox.style.display = 'none'; }}, success ? 1500 : 2500);
+            doc.body.removeChild(tempTextArea);
+        }}
 
         if (copyButton && alertBox) {{
             copyButton.onclick = function() {{
@@ -217,37 +256,35 @@ def render_polished_card(label, text_content, auto_copy=False): # auto_copy is n
                         alertBox.style.color = '#90ee90';
                         alertBox.style.display = 'inline-block';
                         setTimeout(() => {{ alertBox.style.display = 'none'; }}, 1500);
-                        console.log('Text copied (button click)');
+                        console.log('Text copied via navigator.clipboard');
                     }}).catch(err => {{
-                        console.error('Copy failed: ', err);
-                        alertBox.textContent = 'Error!';
-                        alertBox.style.color = 'red';
-                        alertBox.style.display = 'inline-block';
-                        setTimeout(() => {{ alertBox.style.display = 'none'; }}, 2000);
+                        console.warn('navigator.clipboard.writeText failed with error:', err, '. Attempting fallback.');
+                        fallbackCopyTextToClipboard(textToCopy);
                     }});
                 }} else {{
-                    console.warn('Clipboard API not available. Fallback copy method might be needed if essential.');
-                    // Fallback window.prompt is generally not recommended
-                    // window.prompt("Copy to clipboard: Ctrl+C, Enter", textToCopy); 
-                    alertBox.textContent = 'Copy API N/A';
-                    alertBox.style.color = 'orange';
-                    alertBox.style.display = 'inline-block';
-                    setTimeout(() => {{ alertBox.style.display = 'none'; }}, 2000);
+                    console.warn('Clipboard API (navigator.clipboard) not available. Attempting fallback.');
+                    fallbackCopyTextToClipboard(textToCopy);
                 }}
             }};
         }} else {{
-            if (!copyButton) console.error('Copy button ID {unique_button_id} not found.');
-            if (!alertBox) console.error('Alert box ID {unique_alert_id} not found.');
+            if (!copyButton) console.error('Copy button ID {unique_button_id} not found in DOM.');
+            if (!alertBox) console.error('Alert box ID {unique_alert_id} not found in DOM.');
         }}
         
-        // If you re-introduce auto_copy logic:
-        // if ({str(auto_copy).lower()}) {{
-        //     if (navigator && navigator.clipboard && navigator.clipboard.writeText) {{
-        //         navigator.clipboard.writeText(textToCopy).then(() => {{
-        //             console.log('Text auto-copied');
-        //         }}).catch(err => console.error('Auto-copy failed: ', err));
-        //     }}
-        // }}
+        if ({str(auto_copy).lower()}) {{ // Handles the auto_copy parameter
+            if (navigator && navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => console.log('Text auto-copied via navigator.clipboard'))
+                    .catch(err => {{
+                        console.warn('Auto-copy with navigator.clipboard failed:', err, '. Fallback for auto-copy might be too intrusive or not work without direct gesture.');
+                        // Consider if fallback is appropriate for auto-copy or just log.
+                        // fallbackCopyTextToClipboard(textToCopy); // Example: could try fallback
+                    }});
+            }} else {{
+                console.warn('navigator.clipboard not available for auto-copy. Fallback generally not suitable for auto-copy.');
+                // fallbackCopyTextToClipboard(textToCopy); // Generally avoid fallback for auto-copy
+            }}
+        }}
     }})();
     </script>
     """
@@ -661,257 +698,330 @@ with tab1:
         st.markdown("</div>", unsafe_allow_html=True)  # End tab1-wrapper
 
 # =============== TAB 2: VIEW DOCUMENTS ===============
-from html import escape
-import csv
-from retriever import retrieve_similar_human_edit
-
-# CSV file location
-
-def render_polished_card(label, text, auto_copy=False):
-    safe_text = escape(text).replace("\n", "<br>")
-    copy_button_html = f"""
-        <button onclick="navigator.clipboard.writeText(`{escape(text)}`)"
-                style="float: right; background: #444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
-            📋 Copy
-        </button>
-    """ if auto_copy else ""
-
-    st.markdown(f"""
-    <style>
-    .fade-in {{
-        animation: fadeIn 1s ease-out forwards;
-        opacity: 0;
-    }}
-    @keyframes fadeIn {{
-        from {{ opacity: 0; transform: translateY(8px); }}
-        to {{ opacity: 1; transform: translateY(0); }}
-    }}
-    </style>
-
-    <div class="fade-in" style="border-radius: 16px; padding: 20px; background-color: #1e1e1e; color: white; font-size: 16px; line-height: 1.6; box-shadow: 0 0 8px rgba(255,255,255,0.05);">
-        <h4 style="margin-bottom: 12px;">✉️ {label} {copy_button_html}</h4>
-        <div>{safe_text}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def classify_story_tone(text, image_url=None):
-    system_prompt = """You're an assistant that classifies the emotional or stylistic tone of an Instagram story.
-Given the content (text and/or image), return a single keyword tag that best describes the overall vibe. Choose from:
-- humor
-- gym
-- quote
-- aesthetic
-- food
-- travel
-- deep
-- casual
-- celebration
-- pet
-- random
-
-Respond ONLY with the tag.
-"""
-
-    if text.strip():
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ]
-        )
-    elif image_url:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "What's the tone of this story?"},
-                        {"type": "image_url", "image_url": {"url": image_url}}
-                    ]
-                }
-            ]
-        )
-    else:
-        return "random"
-
-    return response.choices[0].message.content.strip().lower()
-
 def generate_conversation_starter(text, image_url=None):
-    tag = classify_story_tone(text, image_url)
+    """
+    Generates a conversation starter based on story text and/or image,
+    without relying on a pre-classified tone/category tag, and with more
+    directive prompting for image analysis.
+    """
+    guidance_line = ""
+    # Attempt to get guidance IF text is present.
+    if text.strip():
+        print(f"DEBUG: Text present. Attempting to get guidance for text: '{text[:50]}...'")
+        try:
+            from tone_fetcher import retrieve_similar_tone_example # Ensure this is correctly imported
+            # Pass an empty string or a very generic tag if your function expects one but shouldn't rely on it heavily here
+            human_example, matched_tone_for_guidance = retrieve_similar_tone_example(text, "") # Passing empty tag
+            if human_example:
+                guidance_line = f"Previously, for similar text content, a human-like reply was: \"{human_example}\""
+            else:
+                guidance_line = "No specific similar past reply example found for guidance based on text."
+        except ImportError:
+            print("DEBUG: tone_fetcher or retrieve_similar_tone_example not found. Skipping text-based guidance.")
+            guidance_line = "Guidance retrieval for text content is unavailable."
+        except Exception as e:
+            print(f"DEBUG: Error retrieving guidance for text: {e}")
+            guidance_line = "Could not retrieve guidance for text content."
+    else:
+        print("DEBUG: Image-only story. No text-based guidance fetch.")
+        guidance_line = "No text provided for specific guidance retrieval."
 
-    # Try to find similar human-written message
-    from tone_fetcher import retrieve_similar_tone_example
-    human_example, matched_tone = retrieve_similar_tone_example(text, tag)
+    system_prompt = (
+        "You are an observant and thoughtful friend crafting Instagram story replies. "
+        "Your primary goal is to initiate genuine, warm, and curious interactions based **directly and literally** on the story's visible content. "
+        "Emphasize authenticity and a natural, human touch. Avoid overly enthusiastic, generic, or speculative responses. "
+        "Use emojis very sparingly (max 1, if any) and only if they truly enhance the message's warmth or curiosity naturally. "
+        "Focus on sounding like a real friend who is genuinely interested in what they are actually seeing."
+    )
+
+    user_prompt_header = "A friend posted an Instagram story."
+    story_content_line = f"Story Content: {text if text.strip() else 'This story is an IMAGE. Your first step is to carefully describe the main visual elements of this image to yourself. What objects, setting, or activity is clearly depicted? Base your reply *only* on these concrete visual observations.'}"
     
+    guidance_line_to_include = guidance_line # Use the fetched guidance_line
 
-    guidance_line = f"Here’s how this person typically responds to {tag}-toned stories: “{human_example}”" if human_example else ""
+    user_prompt = f"""
+    {user_prompt_header}
     
-    prompt = f"""
-Someone posted a story with a '{tag}' tone.
-{text if text.strip() else "Here is the image."}
-
-{guidance_line}
-
-Write a short, friendly, human message in response that matches the tone and feels natural, like something a friend would DM.
+    {story_content_line}
+    
+    Guidance from past similar interactions:
+    {guidance_line_to_include}
+    
+    Your Task:
+    Write a short, warm, and curious reply based strictly on the visible story (or text, if present). The reply should feel human and authentic.
+    
+    Instructions:
+    - **If image only:** Mention or ask about something clearly visible. Don't speculate beyond what's shown. If unclear, use a general but positive line (e.g., "Looks like a great moment!").
+    - **If text is present:** Respond thoughtfully to the text. Use guidance from similar past replies if helpful.
+    - **Keep it grounded:** Curiosity should arise from what you actually see or read. (E.g., for a food photo: "That looks delicious! Is that avocado toast?")
+    - **Be authentic and simple:** Avoid being clever, eccentric, or bubbly. Use real, friendly language.
+    - **Use at most one emoji, only if it truly fits.**
+    - **Be concise and conversational.**
+    
+    **Do not use any preamble. Write the message directly.**
+    
+    **Good reply (for breakfast photo):** "That breakfast looks amazing! Enjoy!"  
+    **Bad reply:** "Cool project! What are you building?"
 """
 
-    messages = [
-        {"role": "system", "content": "You're a friendly assistant writing warm, human Instagram story replies."},
-        {"role": "user", "content": prompt.strip()}
+    messages_for_api = [
+        {"role": "system", "content": system_prompt}
     ]
 
-    if text.strip():
-        response = client.chat.completions.create(model="gpt-4o", messages=messages)
-    else:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                messages[0],
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}}
-                    ]
-                }
-            ]
-        )
+    # Construct the user message part for the API
+    user_content_list = [{"type": "text", "text": user_prompt.strip()}]
+    if image_url:
+        user_content_list.append({"type": "image_url", "image_url": {"url": image_url}})
+    
+    messages_for_api.append({"role": "user", "content": user_content_list if image_url else user_prompt.strip()})
 
-    return response.choices[0].message.content, tag
 
-from notion_client import Client
-notion = Client(auth=os.getenv("NOTION_API_KEY"))
-db_id_raw = os.getenv("NOTION_TONE_DB_ID", "")
-NOTION_DATABASE_ID = db_id_raw.replace("-", "") if db_id_raw else None
-
-def save_human_override(text, image_url, tone, ai_message, human_message):    
     try:
+        response = client.chat.completions.create(
+            model="gpt-4o", # GPT-4o is multimodal and can handle both text and image in content list
+            messages=messages_for_api,
+            max_tokens=150 # Adjust as needed, 150 should be plenty for short DMs
+        )
+        generated_reply = response.choices[0].message.content
+        status_info = "text_based" if text.strip() else "image_based"
+        return generated_reply.strip(), status_info
+
+    except Exception as e:
+        error_message = f"Error in generate_conversation_starter OpenAI call: {e}"
+        print(error_message)
+        # Log the full exception for detailed debugging if needed
+        # import traceback
+        # print(traceback.format_exc())
+        return f"Sorry, an error occurred while generating a reply. Please check logs. ({type(e).__name__})", "error"
+
+
+# Notion client initialization for saving overrides
+try:
+    notion_api_key_env = os.getenv("NOTION_API_KEY")
+    if not notion_api_key_env:
+        print("Warning: NOTION_API_KEY environment variable not set. Notion integration will be disabled.")
+        notion = None
+        NOTION_DATABASE_ID = None
+    else:
+        notion = Client(auth=notion_api_key_env)
+        db_id_raw = os.getenv("NOTION_TONE_DB_ID", "") # This DB might now store general interactions
+        NOTION_DATABASE_ID = db_id_raw.replace("-", "") if db_id_raw else None
+        if not NOTION_DATABASE_ID:
+            print("Warning: NOTION_TONE_DB_ID (or equivalent for saving) is not set. Saving overrides will fail.")
+except Exception as e:
+    print(f"Error initializing Notion client for Tab 2: {e}")
+    notion = None
+    NOTION_DATABASE_ID = None
+
+def save_human_override(story_text, image_url_provided, ai_message, human_message, analysis_type="unknown"):
+    if not notion or not NOTION_DATABASE_ID:
+        st.error("Notion client not configured correctly. Cannot save override.")
+        print("Error: Notion client or DB ID not available for save_human_override.")
+        return
+    image_url_for_notion = "N/A" # Default
+    if image_url_provided and image_url_provided.startswith("data:image"):
+        # It's a base64 string
+        image_url_for_notion = "Image data provided (Base64)" # Placeholder indicating data was present
+        # If you want to store a tiny part of it for identification (still risky for length)
+        # image_url_for_notion = image_url_provided[:100] + "..." # Example: truncate
+    elif image_url_provided: # It might be an actual URL or other placeholder
+        image_url_for_notion = str(image_url_provided)[:2000] # Truncate any other string
+
+    try:
+        properties_payload = {
+            "Story Text": {"rich_text": [{"text": {"content": str(story_text)[:1000] or "N/A"}}]},
+            "Image URL": {"rich_text": [{"text": {"content": image_url_for_notion}}]},
+            "AI Message": {"rich_text": [{"text": {"content": str(ai_message) or "N/A"}}]},
+            "Your message": {"rich_text": [{"text": {"content": str(human_message) or "N/A"}}]},
+            "Tone": {"rich_text": [{"text": {"content": str(analysis_type)}}]} # Storing analysis_type in 'Tone' column
+        }
         notion.pages.create(
             parent={"database_id": NOTION_DATABASE_ID},
-            properties={
-                "Story Text": {
-                    "rich_text": [{"text": {"content": text[:100] or "Untitled"}}]
-                },
-                "Image URL": {
-                    "rich_text": [{"text": {"content": image_url or "N/A"}}]
-                },
-                "Tone": {
-                    "rich_text": [{"text": {"content": tone or "unspecified"}}]
-                },
-                "AI Message": {
-                    "rich_text": [{"text": {"content": ai_message or "none"}}]
-                },
-                "Your message": {  # Must match column name in Notion exactly
-                    "rich_text": [{"text": {"content": human_message or "none"}}]
-                }
-            }
+            properties=properties_payload
         )
-        print("✅ Saved to Notion")
+        st.success("✅ Your version saved to Notion!")
+        print("✅ Override saved to Notion.")
     except Exception as e:
-        print("❌ Notion save failed:", e)
-# ------------------ TAB 2 ------------------ #
+        st.error(f"Notion save failed: {e}")
+        print(f"❌ Notion save failed: {e}")
+        # import traceback
+        # print(traceback.format_exc())
+
+
+# ------------------ TAB 2 UI CODE ------------------ #
+# Assuming tab2 is defined globally, e.g., tab1, tab2, tab3 = st.tabs(...)
 with tab2:
-    st.markdown("<h4>📸 Story Interruption Generator</h4>", unsafe_allow_html=True)
-    if "uploader_key_tab2" not in st.session_state:
-        st.session_state.uploader_key_tab2 = 0
+    st.markdown('''
+    <div style="text-align:center;">
+        <h4 style="margin-bottom:0em;">📸 Story Interruption Generator</h4>
+        <span style="color: #999; font-size: 1rem;">
+            Upload an Instagram story
+        </span>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    # Use a controlled flag just like in tab1
-    if "scroll_to_interruption" not in st.session_state:
-        st.session_state.scroll_to_interruption = False
+    # Initialize session state keys
+    default_tab2_state = {
+        "uploader_key_tab2": 0,
+        "scroll_to_uploaded_image_tab2": False, # New flag for scrolling to image
+        "scroll_to_interruption_output": False,
+        "tab2_conversation_starter": "",
+        "tab2_analysis_type": "",
+        "tab2_story_text_content": "",
+        "tab2_image_url_for_api": None,
+        "last_uploaded_story_name_tab2": None
+    }
+    for key, default_value in default_tab2_state.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
 
-    uploaded_file = st.file_uploader(
-        "Upload an Instagram Story Screenshot",
+    uploaded_file_tab2 = st.file_uploader(
+        "", # Label for uploader
         type=["jpg", "jpeg", "png"],
-        key=f"story_image_tab2_{st.session_state.uploader_key_tab2}"
+        key=f"story_image_tab2_{st.session_state.uploader_key_tab2}",
+        help="Upload an image of an Instagram story to generate a reply."
     )
-    
 
-    if uploaded_file:
-        image_bytes = uploaded_file.read()
-        image = Image.open(io.BytesIO(image_bytes))
-        st.image(image, caption="Uploaded Story", use_container_width=True)
-    
-        text = extract_text_from_image(image_bytes)
-        base64_image = base64.b64encode(image_bytes).decode("utf-8")
-        image_url = f"data:image/png;base64,{base64_image}" if not text.strip() else None
-    
-        # ✅ Place the anchor *before* triggering scroll
-        st.markdown('<div id="storyTextAnchor"></div>', unsafe_allow_html=True)
-    
-        # Set flag if new upload
-        if "last_uploaded_story_name" not in st.session_state or \
-           st.session_state.last_uploaded_story_name != uploaded_file.name:
-            st.session_state.scroll_to_story_text = True
-            st.session_state.last_uploaded_story_name = uploaded_file.name
-    
-        if st.session_state.get("scroll_to_story_text", False):
-            components.html("""
+    # --- Define an anchor ID for the uploaded image section ---
+    UPLOADED_IMAGE_ANCHOR_ID = "uploadedImageAnchorTab2"
+
+    if uploaded_file_tab2:
+        new_file_uploaded = st.session_state.last_uploaded_story_name_tab2 != uploaded_file_tab2.name
+        
+        if new_file_uploaded:
+            # Reset for new file
+            st.session_state.tab2_conversation_starter = ""
+            st.session_state.tab2_analysis_type = ""
+            st.session_state.tab2_story_text_content = ""
+            st.session_state.tab2_image_url_for_api = None
+            st.session_state.last_uploaded_story_name_tab2 = uploaded_file_tab2.name
+            st.session_state.scroll_to_uploaded_image_tab2 = True # Trigger scroll to image
+            st.session_state.scroll_to_interruption_output = False # Ensure output scroll is reset
+
+        image_bytes = uploaded_file_tab2.getvalue()
+        
+        
+
+        try:
+            image_display = Image.open(io.BytesIO(image_bytes))
+            st.image(image_display, caption="Uploaded Story", use_container_width=True)
+        except Exception as e:
+            st.error(f"Could not display image: {e}")
+
+        # --- Trigger scroll to the uploaded image section ---
+        if st.session_state.scroll_to_uploaded_image_tab2:
+            components.html(f"""
                 <script>
-                setTimeout(function() {
-                    const el = window.parent.document.getElementById("storyTextAnchor");
-                    if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                }, 400);
+                setTimeout(function() {{
+                    const el = window.parent.document.getElementById("{UPLOADED_IMAGE_ANCHOR_ID}");
+                    if (el) {{
+                        // Scroll so the top of the element is at the top of the viewport, or slightly below
+                        el.scrollIntoView({{ behavior: "smooth", block: "start" }});
+                    }}
+                }}, 100); // Short delay to ensure element is rendered
                 </script>
             """, height=0)
-            st.session_state.scroll_to_story_text = False
-    
-        # Proceed with the rest
-        if text.strip():
-            st.subheader("📝 Detected Story Text")
-            st.write(text)
-        else:
-            st.subheader("🖼 No text detected — analyzing image")
-    
-        if "conversation_starter" not in st.session_state or "conversation_tone" not in st.session_state:
-            with st.spinner("🤖Generating message.."):
-                reply, tone_tag = generate_conversation_starter(text, image_url)
-                st.session_state.conversation_starter = reply
-                st.session_state.conversation_tone = tone_tag
-    
-        st.markdown(f"🧠 **Detected Tone Tag:** `{st.session_state.conversation_tone}`")
-        render_polished_card("Conversation Starter", st.session_state.conversation_starter)
-    
+            st.session_state.scroll_to_uploaded_image_tab2 = False # Reset flag after scrolling
 
-        # Editable field
-        user_edit = st.text_area("✏️ Your Adjusted Message", value=st.session_state.conversation_starter, height=120)
+        # Process content (OCR, etc.) only if it's a new file or not yet processed
+        # This condition checks if processing is needed for the *current* uploaded_file_tab2
+        # We use new_file_uploaded flag or check if content is missing
+        needs_processing = new_file_uploaded or \
+                           (not st.session_state.tab2_story_text_content and st.session_state.tab2_image_url_for_api is None)
+        # --- Place the anchor for the uploaded image section ---
+        st.markdown(f'<div id="{UPLOADED_IMAGE_ANCHOR_ID}"></div>', unsafe_allow_html=True)
+        if needs_processing:
+            with st.spinner("Analyzing story content..."):
+                ocr_text_result = extract_text_from_image(image_bytes)
+                st.session_state.tab2_story_text_content = ocr_text_result if ocr_text_result else ""
 
-        # Save edited message
-        col1_gen, col2_regen = st.columns(2)
-        with col1_gen:
-            if st.button("✅ Save My Version", use_container_width=True):
-                # Handle image_url fallback gracefully
-                image_url_safe = image_url if image_url else "N/A"
-            
-                save_human_override(
-                    text,
-                    image_url_safe,
-                    st.session_state.conversation_tone,
-                    st.session_state.conversation_starter,
-                    user_edit
-                )
-                st.success("✅ Saved to Notion! Your tone will influence future responses.")
-        # Regenerate message
-        with col2_regen:
-            if st.button("🔄 Regenerate Message",use_container_width=True):
-                reply, tone_tag = generate_conversation_starter(text, image_url)
-                st.session_state.conversation_starter = reply
-                st.session_state.conversation_tone = tone_tag
-                st.rerun()
-    if st.button("➕ Start New Interruption", key="new_story_button",use_container_width=True):
-        # Reset relevant state
-        for key in ["conversation_starter", "conversation_tone", "last_uploaded_story_name", "scroll_to_story_text"]:
-            if key in st.session_state:
-                del st.session_state[key]
-    
+                if not st.session_state.tab2_story_text_content.strip():
+                    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+                    file_extension = uploaded_file_tab2.type.split('/')[-1] if uploaded_file_tab2.type else 'png'
+                    st.session_state.tab2_image_url_for_api = f"data:image/{file_extension};base64,{base64_image}"
+                elif uploaded_file_tab2: # Always send image context if available (even with text)
+                     base64_image = base64.b64encode(image_bytes).decode("utf-8")
+                     file_extension = uploaded_file_tab2.type.split('/')[-1] if uploaded_file_tab2.type else 'png'
+                     st.session_state.tab2_image_url_for_api = f"data:image/{file_extension};base64,{base64_image}"
+
+        # Generate conversation starter if not already generated for this upload
+        if not st.session_state.tab2_conversation_starter:
+            if st.session_state.tab2_story_text_content.strip() or st.session_state.tab2_image_url_for_api:
+                with st.spinner("🤖 Crafting a friendly message..."):
+                    reply, analysis_type = generate_conversation_starter(
+                        st.session_state.tab2_story_text_content,
+                        st.session_state.tab2_image_url_for_api
+                    )
+                    st.session_state.tab2_conversation_starter = reply
+                    st.session_state.tab2_analysis_type = analysis_type
+                    # After generating, set flag to scroll to output if you want a second scroll
+                    # st.session_state.scroll_to_interruption_output = True 
+            else:
+                st.session_state.tab2_conversation_starter = "Could not process input. No text or image data available."
+                st.session_state.tab2_analysis_type = "error"
+        
+        # ----- Output Area (Suggested Reply, Edit box, Buttons) -----
+        # This anchor is for scrolling to the *generated output* if needed later
+        OUTPUT_ANCHOR_ID = "interruptionOutputAnchorTab2" 
+        st.markdown(f'<div id="{OUTPUT_ANCHOR_ID}"></div>', unsafe_allow_html=True)
+        
+        # Optional: If you want a second scroll to the output after AI generation
+        # if st.session_state.scroll_to_interruption_output:
+        #     components.html(f"""
+        #         <script>
+        #         setTimeout(function() {{
+        #             const el = window.parent.document.getElementById("{OUTPUT_ANCHOR_ID}");
+        #             if (el) {{ el.scrollIntoView({{ behavior: "smooth", block: "center" }}); }}
+        #         }}, 300);
+        #         </script>
+        #     """, height=0)
+        #     st.session_state.scroll_to_interruption_output = False
+
+
+        if st.session_state.tab2_conversation_starter:
+            render_polished_card("Suggested Conversation Starter", st.session_state.tab2_conversation_starter, auto_copy=True)
+
+            user_edited_reply_tab2 = st.text_area(
+                "✏️ Adjust or write your own message:",
+                value=st.session_state.tab2_conversation_starter if st.session_state.tab2_analysis_type != "error" else "",
+                height=120,
+                key="user_edited_reply_tab2_area"
+            )
+
+            button_col1_tab2, button_col2_tab2 = st.columns(2)
+            with button_col1_tab2:
+                if st.button("💾 Save My Version to Notion", use_container_width=True, key="save_override_button_tab2",
+                             disabled=(st.session_state.tab2_analysis_type == "error")):
+                    if user_edited_reply_tab2.strip():
+                        image_url_to_save = st.session_state.tab2_image_url_for_api if st.session_state.tab2_image_url_for_api else "N/A_Text_May_Be_Primary"
+                        save_human_override(
+                            story_text=st.session_state.tab2_story_text_content,
+                            image_url_provided=image_url_to_save,
+                            ai_message=st.session_state.tab2_conversation_starter,
+                            human_message=user_edited_reply_tab2,
+                            analysis_type=st.session_state.tab2_analysis_type
+                        )
+                    else:
+                        st.warning("Please enter or adjust the message before saving.")
+            with button_col2_tab2:
+                if st.button("🔄 Get Another Suggestion", use_container_width=True, key="regenerate_button_tab2",
+                             disabled=(st.session_state.tab2_analysis_type == "error")):
+                    st.session_state.tab2_conversation_starter = "" 
+                    st.rerun()
+        # Removed the "Upload an image to get started" from here as it's covered by the uploader state
+
+    # "Start New Interruption Idea" button outside the `if uploaded_file_tab2:` block
+    if st.button("✨ Start New Interruption Idea", use_container_width=True, key="new_interruption_button_tab2", type="secondary"):
+        keys_to_reset_tab2 = [
+            "tab2_conversation_starter", "tab2_analysis_type",
+            "last_uploaded_story_name_tab2", "scroll_to_interruption_output", "scroll_to_uploaded_image_tab2",
+            "tab2_story_text_content", "tab2_image_url_for_api"
+        ]
+        for key_to_reset in keys_to_reset_tab2:
+            if key_to_reset in st.session_state:
+                del st.session_state[key_to_reset]
         st.session_state.uploader_key_tab2 += 1
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)  # End tab2-wrapper
-
 
 # =============== TAB 3: PAST HUDDLES ===============
 with tab3:

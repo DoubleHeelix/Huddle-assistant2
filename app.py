@@ -753,9 +753,11 @@ def generate_conversation_starter(text, image_url=None):
     Instructions:
     - **If image only:** Mention or ask about something clearly visible. Don't speculate beyond what's shown. If unclear, use a general but positive line (e.g., "Looks like a great moment!").
     - **If text is present:** Respond thoughtfully to the text. Use guidance from similar past replies if helpful.
-    - **Keep it grounded:** Curiosity should arise from what you actually see or read. (E.g., for a food photo: "That looks delicious! Is that avocado toast?")
+    - **Keep it grounded:** Curiosity should arise from what you actually see or read. (E.g., for a food photo: That looks delicious! Is that avocado toast?)
     - **Be authentic and simple:** Avoid being clever, eccentric, or bubbly. Use real, friendly language.
     - **Use at most one emoji, only if it truly fits.**
+    - **Don't include Quatation marks in your draft.
+    - **Where possible based on your understanding of the uploaded story, include a question at the end to promote a conversation.
     - **Be concise and conversational.**
     
     **Do not use any preamble. Write the message directly.**
@@ -848,180 +850,185 @@ def save_human_override(story_text, image_url_provided, ai_message, human_messag
         # print(traceback.format_exc())
 
 
-# ------------------ TAB 2 UI CODE ------------------ #
-# Assuming tab2 is defined globally, e.g., tab1, tab2, tab3 = st.tabs(...)
+# ------------- TAB 2: STORY INTERRUPTION GENERATOR --------------
+
 with tab2:
-    st.markdown('''
-    <div style="text-align:center;">
-        <h4 style="margin-bottom:0em;">📸 Story Interruption Generator</h4>
-        <span style="color: #999; font-size: 1rem;">
-            Upload an Instagram story
-        </span>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;"><h4>📸 Story Interruption Generator</h4></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;"><span style="font-size:15px; color:#ccc;">Upload an Instagram story. The Huddle bot will suggest 3 warm, curious, and authentic replies based on the content.</span></div>', unsafe_allow_html=True)
 
-    # Initialize session state keys
-    default_tab2_state = {
-        "uploader_key_tab2": 0,
-        "scroll_to_uploaded_image_tab2": False, # New flag for scrolling to image
-        "scroll_to_interruption_output": False,
-        "tab2_conversation_starter": "",
-        "tab2_analysis_type": "",
-        "tab2_story_text_content": "",
-        "tab2_image_url_for_api": None,
-        "last_uploaded_story_name_tab2": None
-    }
-    for key, default_value in default_tab2_state.items():
-        if key not in st.session_state:
-            st.session_state[key] = default_value
+    if "uploader_key_tab2" not in st.session_state:
+        st.session_state.uploader_key_tab2 = 0
 
-    uploaded_file_tab2 = st.file_uploader(
-        "", # Label for uploader
+    uploaded_file = st.file_uploader(
+        "",
         type=["jpg", "jpeg", "png"],
-        key=f"story_image_tab2_{st.session_state.uploader_key_tab2}",
-        help="Upload an image of an Instagram story to generate a reply."
+        key=f"story_image_tab2_{st.session_state.uploader_key_tab2}"
     )
 
-    # --- Define an anchor ID for the uploaded image section ---
-    UPLOADED_IMAGE_ANCHOR_ID = "uploadedImageAnchorTab2"
+    if uploaded_file:
+        image_bytes = uploaded_file.read()
+        image = Image.open(io.BytesIO(image_bytes))
+        st.image(image, caption="Uploaded Story", use_container_width=True)
 
-    if uploaded_file_tab2:
-        new_file_uploaded = st.session_state.last_uploaded_story_name_tab2 != uploaded_file_tab2.name
-        
-        if new_file_uploaded:
-            # Reset for new file
-            st.session_state.tab2_conversation_starter = ""
-            st.session_state.tab2_analysis_type = ""
-            st.session_state.tab2_story_text_content = ""
-            st.session_state.tab2_image_url_for_api = None
-            st.session_state.last_uploaded_story_name_tab2 = uploaded_file_tab2.name
-            st.session_state.scroll_to_uploaded_image_tab2 = True # Trigger scroll to image
-            st.session_state.scroll_to_interruption_output = False # Ensure output scroll is reset
-
-        image_bytes = uploaded_file_tab2.getvalue()
-        
+        text = extract_text_from_image(image_bytes)
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        image_url = f"data:image/png;base64,{base64_image}"
         
 
-        try:
-            image_display = Image.open(io.BytesIO(image_bytes))
-            st.image(image_display, caption="Uploaded Story", use_container_width=True)
-        except Exception as e:
-            st.error(f"Could not display image: {e}")
+        st.markdown('<div id="storyTextAnchor"></div>', unsafe_allow_html=True)
 
-        # --- Trigger scroll to the uploaded image section ---
-        if st.session_state.scroll_to_uploaded_image_tab2:
-            components.html(f"""
+        if "last_uploaded_story_name" not in st.session_state or st.session_state.last_uploaded_story_name != uploaded_file.name:
+            st.session_state.scroll_to_story_text = True
+            st.session_state.last_uploaded_story_name = uploaded_file.name
+
+        if st.session_state.get("scroll_to_story_text", False):
+            components.html("""
                 <script>
-                setTimeout(function() {{
-                    const el = window.parent.document.getElementById("{UPLOADED_IMAGE_ANCHOR_ID}");
-                    if (el) {{
-                        // Scroll so the top of the element is at the top of the viewport, or slightly below
-                        el.scrollIntoView({{ behavior: "smooth", block: "start" }});
-                    }}
-                }}, 100); // Short delay to ensure element is rendered
+                setTimeout(function() {
+                    const el = window.parent.document.getElementById("storyTextAnchor");
+                    if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                }, 400);
                 </script>
             """, height=0)
-            st.session_state.scroll_to_uploaded_image_tab2 = False # Reset flag after scrolling
+            st.session_state.scroll_to_story_text = False
 
-        # Process content (OCR, etc.) only if it's a new file or not yet processed
-        # This condition checks if processing is needed for the *current* uploaded_file_tab2
-        # We use new_file_uploaded flag or check if content is missing
-        needs_processing = new_file_uploaded or \
-                           (not st.session_state.tab2_story_text_content and st.session_state.tab2_image_url_for_api is None)
-        # --- Place the anchor for the uploaded image section ---
-        st.markdown(f'<div id="{UPLOADED_IMAGE_ANCHOR_ID}"></div>', unsafe_allow_html=True)
-        if needs_processing:
-            with st.spinner("Analyzing story content..."):
-                ocr_text_result = extract_text_from_image(image_bytes)
-                st.session_state.tab2_story_text_content = ocr_text_result if ocr_text_result else ""
+        # ------------ MULTIPLE REPLIES LOGIC ------------
 
-                if not st.session_state.tab2_story_text_content.strip():
-                    base64_image = base64.b64encode(image_bytes).decode("utf-8")
-                    file_extension = uploaded_file_tab2.type.split('/')[-1] if uploaded_file_tab2.type else 'png'
-                    st.session_state.tab2_image_url_for_api = f"data:image/{file_extension};base64,{base64_image}"
-                elif uploaded_file_tab2: # Always send image context if available (even with text)
-                     base64_image = base64.b64encode(image_bytes).decode("utf-8")
-                     file_extension = uploaded_file_tab2.type.split('/')[-1] if uploaded_file_tab2.type else 'png'
-                     st.session_state.tab2_image_url_for_api = f"data:image/{file_extension};base64,{base64_image}"
-
-        # Generate conversation starter if not already generated for this upload
-        if not st.session_state.tab2_conversation_starter:
-            if st.session_state.tab2_story_text_content.strip() or st.session_state.tab2_image_url_for_api:
-                with st.spinner("🤖 Crafting a friendly message..."):
-                    reply, analysis_type = generate_conversation_starter(
-                        st.session_state.tab2_story_text_content,
-                        st.session_state.tab2_image_url_for_api
-                    )
-                    st.session_state.tab2_conversation_starter = reply
-                    st.session_state.tab2_analysis_type = analysis_type
-                    # After generating, set flag to scroll to output if you want a second scroll
-                    # st.session_state.scroll_to_interruption_output = True 
-            else:
-                st.session_state.tab2_conversation_starter = "Could not process input. No text or image data available."
-                st.session_state.tab2_analysis_type = "error"
-        
-        # ----- Output Area (Suggested Reply, Edit box, Buttons) -----
-        # This anchor is for scrolling to the *generated output* if needed later
-        OUTPUT_ANCHOR_ID = "interruptionOutputAnchorTab2" 
-        st.markdown(f'<div id="{OUTPUT_ANCHOR_ID}"></div>', unsafe_allow_html=True)
-        
-        # Optional: If you want a second scroll to the output after AI generation
-        # if st.session_state.scroll_to_interruption_output:
-        #     components.html(f"""
-        #         <script>
-        #         setTimeout(function() {{
-        #             const el = window.parent.document.getElementById("{OUTPUT_ANCHOR_ID}");
-        #             if (el) {{ el.scrollIntoView({{ behavior: "smooth", block: "center" }}); }}
-        #         }}, 300);
-        #         </script>
-        #     """, height=0)
-        #     st.session_state.scroll_to_interruption_output = False
-
-
-        if st.session_state.tab2_conversation_starter:
-            render_polished_card("Suggested Conversation Starter", st.session_state.tab2_conversation_starter, auto_copy=True)
-
-            user_edited_reply_tab2 = st.text_area(
-                "✏️ Adjust or write your own message:",
-                value=st.session_state.tab2_conversation_starter if st.session_state.tab2_analysis_type != "error" else "",
-                height=120,
-                key="user_edited_reply_tab2_area"
-            )
-
-            button_col1_tab2, button_col2_tab2 = st.columns(2)
-            with button_col1_tab2:
-                if st.button("💾 Save My Version to Notion", use_container_width=True, key="save_override_button_tab2",
-                             disabled=(st.session_state.tab2_analysis_type == "error")):
-                    if user_edited_reply_tab2.strip():
-                        image_url_to_save = st.session_state.tab2_image_url_for_api if st.session_state.tab2_image_url_for_api else "N/A_Text_May_Be_Primary"
-                        save_human_override(
-                            story_text=st.session_state.tab2_story_text_content,
-                            image_url_provided=image_url_to_save,
-                            ai_message=st.session_state.tab2_conversation_starter,
-                            human_message=user_edited_reply_tab2,
-                            analysis_type=st.session_state.tab2_analysis_type
-                        )
+        def generate_multiple_conversation_starters(text, image_url=None, n=3):
+            """
+            Generates n high-quality conversation starters using your prompt,
+            each tightly grounded in literal image/text content, no tone tags.
+            """
+            guidance_line = ""
+            if text.strip():
+                try:
+                    from tone_fetcher import retrieve_similar_tone_example
+                    human_example, _ = retrieve_similar_tone_example(text, "")
+                    if human_example:
+                        guidance_line = f"Previously, a human reply to similar text was: {human_example}"
                     else:
-                        st.warning("Please enter or adjust the message before saving.")
-            with button_col2_tab2:
-                if st.button("🔄 Get Another Suggestion", use_container_width=True, key="regenerate_button_tab2",
-                             disabled=(st.session_state.tab2_analysis_type == "error")):
-                    st.session_state.tab2_conversation_starter = "" 
-                    st.rerun()
-        # Removed the "Upload an image to get started" from here as it's covered by the uploader state
+                        guidance_line = "No similar past reply available."
+                except Exception:
+                    guidance_line = "No guidance available."
+            else:
+                guidance_line = "No text provided for specific guidance retrieval."
+            
+            system_prompt = (
+                "You are an observant and thoughtful friend crafting Instagram story replies. "
+                "Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. "
+                "Always reference what's actually there—no guessing or speculation. "
+                "Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally."
+            )
+        
+            user_prompt_header = "A friend posted an Instagram story."
+            story_content_line = (
+                f"Story Content: {text.strip() if text.strip() else 'This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.'}"
+            )
+            guidance_line_to_include = guidance_line
+        
+            user_prompt = f"""
+        {user_prompt_header}
+        
+        {story_content_line}
+        
+        Guidance from past similar interactions:
+        {guidance_line_to_include}
+        
+        Your Task:
+        Write a short, warm, and curious reply based strictly on the visible story (or text, if present). The reply should feel human and authentic.
+        
+        Instructions:
+        - If image only: Mention or ask about something clearly visible. Don't speculate beyond what's shown. If unclear, use a general but positive line.
+        - If text: Respond thoughtfully to the text. Use past guidance if helpful.
+        - Where possible, include a question at the end to prompt conversation.
+        - Be authentic and simple. Avoid being overly clever, eccentric, or bubbly.
+        - Use at most one emoji, only if it fits.
+        - Do **not** use quotation marks in your draft.
+        - Do **not** use any preamble—just write the message directly.
+        - If the image contains overlays, music tags, or device UI, **ignore** them and focus only on the central, main scene or food.
+        
+        
+        
+        Examples:
+        Good: "That breakfast looks amazing! Enjoy!"  
+        Bad: "Cool project! What are you building?"
+        """
+        
+            # Build API message list
+            messages_for_api = [{"role": "system", "content": system_prompt}]
+            user_content_list = [{"type": "text", "text": user_prompt.strip()}]
+            if image_url:
+                user_content_list.append({"type": "image_url", "image_url": {"url": image_url}})
+            messages_for_api.append({
+                "role": "user",
+                "content": user_content_list if image_url else user_prompt.strip()
+            })
+        
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages_for_api,
+                max_tokens=150,
+                n=n,
+                temperature=1.0
+            )
+            # Return all completions as a list
+            completions = [choice.message.content.strip() for choice in response.choices]
+            return completions
+        
 
-    # "Start New Interruption Idea" button outside the `if uploaded_file_tab2:` block
-    if st.button("✨ Start New Interruption Idea", use_container_width=True, key="new_interruption_button_tab2", type="secondary"):
-        keys_to_reset_tab2 = [
-            "tab2_conversation_starter", "tab2_analysis_type",
-            "last_uploaded_story_name_tab2", "scroll_to_interruption_output", "scroll_to_uploaded_image_tab2",
-            "tab2_story_text_content", "tab2_image_url_for_api"
-        ]
-        for key_to_reset in keys_to_reset_tab2:
-            if key_to_reset in st.session_state:
-                del st.session_state[key_to_reset]
-        st.session_state.uploader_key_tab2 += 1
-        st.rerun()
+        # Store completions in session state to avoid rerun issues
+        if "conversation_starters" not in st.session_state:
+            with st.spinner("🤖 Generating 3 options..."):
+                st.session_state.conversation_starters = generate_multiple_conversation_starters(text, image_url, n=3)
+        
+        for idx, reply in enumerate(st.session_state.conversation_starters):
+            render_polished_card(f"Conversation Starter #{idx+1}", reply, auto_copy=True)
+        
+        # Editable field to choose and edit any suggestion
+        st.markdown("#### ✏️ Your Adjusted Message")
+        # Prefill with the first suggestion by default, or whatever last used
+        if "user_edit" not in st.session_state:
+            st.session_state.user_edit = st.session_state.conversation_starters[0]
+        st.session_state.user_edit = st.text_area(
+            "",
+            value=st.session_state.user_edit,
+            height=120
+        )
+        
+        # Save edited message
+        col1_gen, col2_regen = st.columns(2)
+        with col1_gen:
+            if st.button("✅ Save My Version", use_container_width=True):
+                image_url_safe = image_url if image_url else "N/A"
+                save_human_override(
+                    text,
+                    image_url_safe,
+                    "N/A",  # No tone/tag
+                    "\n".join(st.session_state.conversation_starters),
+                    st.session_state.user_edit
+                )
+                st.success("✅ Saved to Notion! Your edits will influence future responses.")
+        
+        with col2_regen:
+            if st.button("🔄 Regenerate All", use_container_width=True):
+                replies = generate_multiple_conversation_starters(text, image_url)
+                st.session_state.conversation_starters = replies
+                # Reset user edit to first new reply
+                st.session_state.user_edit = replies[0]
+                st.rerun()
+        
+        if st.button("➕ Start New Interruption", key="new_story_button", use_container_width=True):
+            # Reset relevant state
+            for key in ["conversation_starters", "last_uploaded_story_name", "scroll_to_story_text", "user_edit"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state.uploader_key_tab2 += 1
+            st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 # =============== TAB 3: PAST HUDDLES ===============
 with tab3:

@@ -48,7 +48,7 @@ with open("styles.css") as f:
 
 st.markdown(
     """
-    <div class="header-container">
+    <div class="header-container animate-header">
         <h2>🤝 Huddle Assistant</h2>
         <p>Lead confident convos on the go</p>
     </div>

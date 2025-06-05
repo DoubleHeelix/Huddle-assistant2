@@ -53,35 +53,23 @@ def embed_and_store_interaction(screenshot_text, user_draft, ai_suggested, user_
     )
 
 def retrieve_similar_examples(screenshot_text, user_draft, top_k=3, score_threshold=0.7):
-    import os
-    from qdrant_client import QdrantClient
-    from memory_vector import get_embedding
-
-    COLLECTION_NAME = "huddle_memory"
-
-    client = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY")
-    )
 
     query = f"{screenshot_text}\n\n{user_draft}"
     vector = get_embedding(query)
 
-    search_result = client.search(
+    search_result = qdrant.search(
         collection_name=COLLECTION_NAME,
         query_vector=vector,
         limit=top_k,
         with_payload=True,
-        with_vectors=False
+        with_vectors=False,
+        score_threshold=score_threshold,
     )
 
     examples = []
     for point in search_result:
         payload = point.payload or {}
         score = point.score
-
-        if score < score_threshold:
-            continue
 
         examples.append({
             "screenshot_text": payload.get("screenshot", ""),

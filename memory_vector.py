@@ -55,9 +55,6 @@ def embed_and_store_interaction(screenshot_text, user_draft, ai_suggested, user_
 def retrieve_similar_examples(screenshot_text, user_draft, top_k=3, score_threshold=0.7):
     import os
     from qdrant_client import QdrantClient
-    from memory_vector import get_embedding
-
-    COLLECTION_NAME = "huddle_memory"
 
     client = QdrantClient(
         url=os.getenv("QDRANT_URL"),

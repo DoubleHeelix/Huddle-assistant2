@@ -56,6 +56,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+components.html(
+    """
+    <script>
+        const header = document.querySelector('.animate-header');
+        if (header) {
+            header.addEventListener('animationend', () => {
+                header.classList.remove('animate-header');
+            });
+        }
+    </script>
+    """,
+    height=0,
+)
+
 # ---- Session State Initialization ----
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0

@@ -27,7 +27,7 @@
 
 @keyframes header-intro {
     0% {
-        transform: scale(3);
+        transform: scale(12);
         opacity: 0;
     }
     50% {

@@ -43,50 +43,22 @@ VECTOR_SIZE = 1536
 st.set_page_config(page_title="Huddle Assistant", layout="centered")
 
 # ---- HEADER ----
-st.markdown("""
-    <div style="
-        background: linear-gradient(135deg, #8a3ffc, #b88cff);
-        padding: 20px; border-radius: 12px; color: white;
-        text-align: center; font-family: 'Segoe UI', sans-serif;
-        margin-bottom: 24px;">
-        <h2 style="margin: 0;">🤝 Huddle Assistant</h2>
-        <p style="margin: 4px 0 0 0; font-size: 14px;">
-            Lead confident convos on the go
-        </p>
+with open("styles.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <div class="header-container">
+        <h2>🤝 Huddle Assistant</h2>
+        <p>Lead confident convos on the go</p>
     </div>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---- Session State Initialization ----
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
-
-# ---- CSS for Spacing & Tabs ----
-st.markdown("""
-<style>
-section.main > div {padding-top: 0rem !important; padding-bottom: 0rem !important;}
-.css-1kyxreq, .stSelectbox, .stMarkdown, .stSubheader {margin-bottom: 0.5rem !important; margin-top: 0.5rem !important;}
-.st-expander {margin-top: -0.5rem !important;}
-.stTabs [data-baseweb="tab-list"] {
-    gap: 0.5rem !important; background: none !important;
-    border-bottom: 2px solid #27273a !important; margin-bottom: 0px !important;
-    padding: 0 6vw !important; justify-content: left;
-}
-.stTabs [data-baseweb="tab"] {
-    color: #8a3ffc !important; font-weight: 600; font-size: 1.05rem;
-    padding: 8px 16px !important; border-radius: 16px 16px 0 0;
-    background: none !important; transition: background 0.18s;
-    margin-bottom: -2px;
-}
-.stTabs [aria-selected="true"] {
-    background: linear-gradient(90deg, #8a3ffc 65%, #b88cff 100%) !important;
-    color: #fff !important; border-bottom: 2.5px solid #8a3ffc !important;
-    box-shadow: 0 2px 8px rgba(138,63,252,0.08);
-}
-.stTabs [aria-selected="false"]:hover {
-    background: #ede9fe !important; color: #5d27c1 !important;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # ---- Sidebar Settings ----
 with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
@@ -168,41 +140,28 @@ def render_polished_card(label, text_content, auto_copy=True): # Default auto_co
     # 4. HTML for the button and alert
     copy_button_html_structure = f"""
         <button id="{unique_button_id}"
-                title="Copy to clipboard"
-                style="float: right; background: #444; color: white; border: none; 
-                       padding: 6px 10px; border-radius: 6px; cursor: pointer;
-                       font-size: 14px; line-height: 1;">
+                title="Copy to clipboard" class="copy-button">
             📋 Copy
         </button>
-        <span id="{unique_alert_id}" 
-              style="display:none; float: right; margin-right: 8px; color: #90ee90; 
-                     font-size: 13px; line-height: 1; padding-top: 7px;">
+        <span id="{unique_alert_id}" class="copy-alert">
             Copied!
         </span>
     """
 
     # 5. Main card HTML structure
-    st.markdown(f"""
-    <style>
-    .card-header-h4 {{
-        margin-bottom: 12px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }}
-    .card-header-h4 > span:first-of-type {{ margin-right: auto; }}
-    .card-header-h4 > div.button-container {{ display: flex; align-items: center; }}
-    </style>
-
-    <div style="border-radius: 16px; padding: 20px; background-color: #1e1e1e; color: white; font-size: 16px; line-height: 1.6; box-shadow: 0 0 8px rgba(255,255,255,0.05);">
+    st.markdown(
+        f"""
+    <div class="custom-card">
         <div class="card-header-h4">
             <span>✉️ {label}</span>
             <div class="button-container">{copy_button_html_structure}</div>
         </div>
-        <div style="clear: both;"></div>
+        <div class="clear-both"></div>
         <div>{safe_html_text_for_display}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     # 6. JavaScript for functionality, run via components.html
     script_to_run = f"""
@@ -513,8 +472,8 @@ with tab1:
         # ---- Draft UI ----
         # (This section remains the same as your provided code)
         st.markdown(
-            """<p style='margin-bottom: 4px; font-size: 1em; color: inherit; font-weight: normal; padding: 0; line-height: 1.5;'>Your Draft Message</p>""", 
-            unsafe_allow_html=True
+            """<p class='draft-message-label'>Your Draft Message</p>""",
+            unsafe_allow_html=True,
         )
         st.session_state.user_draft_current = st.text_area(
             "Internal draft message label for accessibility", 
@@ -853,8 +812,14 @@ def save_human_override(story_text, image_url_provided, ai_message, human_messag
 # ------------- TAB 2: STORY INTERRUPTION GENERATOR --------------
 
 with tab2:
-    st.markdown('<div style="text-align:center;"><h4>📸 Story Interruption Generator</h4></div>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align:center;"><span style="font-size:15px; color:#ccc;">Upload an Instagram story. The Huddle bot will suggest 3 warm, curious, and authentic replies based on the content.</span></div>', unsafe_allow_html=True)
+    st.markdown(
+        "<div class='center-text'><h4>📸 Story Interruption Generator</h4></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='center-text'><span class='story-desc'>Upload an Instagram story. The Huddle bot will suggest 3 warm, curious, and authentic replies based on the content.</span></div>",
+        unsafe_allow_html=True,
+    )
 
     if "uploader_key_tab2" not in st.session_state:
         st.session_state.uploader_key_tab2 = 0

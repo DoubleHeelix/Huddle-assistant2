@@ -36,50 +36,22 @@ VECTOR_SIZE = 1536
 st.set_page_config(page_title="Huddle Assistant", layout="centered")
 
 # ---- HEADER ----
-st.markdown("""
-    <div style="
-        background: linear-gradient(135deg, #8a3ffc, #b88cff);
-        padding: 20px; border-radius: 12px; color: white;
-        text-align: center; font-family: 'Segoe UI', sans-serif;
-        margin-bottom: 24px;">
-        <h2 style="margin: 0;">🤝 Huddle Assistant</h2>
-        <p style="margin: 4px 0 0 0; font-size: 14px;">
-            Lead confident convos on the go
-        </p>
+with open("styles.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <div class="header-container">
+        <h2>🤝 Huddle Assistant</h2>
+        <p>Lead confident convos on the go</p>
     </div>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---- Session State Initialization ----
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
-
-# ---- CSS for Spacing & Tabs ----
-st.markdown("""
-<style>
-section.main > div {padding-top: 0rem !important; padding-bottom: 0rem !important;}
-.css-1kyxreq, .stSelectbox, .stMarkdown, .stSubheader {margin-bottom: 0.5rem !important; margin-top: 0.5rem !important;}
-.st-expander {margin-top: -0.5rem !important;}
-.stTabs [data-baseweb="tab-list"] {
-    gap: 0.5rem !important; background: none !important;
-    border-bottom: 2px solid #27273a !important; margin-bottom: 0px !important;
-    padding: 0 6vw !important; justify-content: left;
-}
-.stTabs [data-baseweb="tab"] {
-    color: #8a3ffc !important; font-weight: 600; font-size: 1.05rem;
-    padding: 8px 16px !important; border-radius: 16px 16px 0 0;
-    background: none !important; transition: background 0.18s;
-    margin-bottom: -2px;
-}
-.stTabs [aria-selected="true"] {
-    background: linear-gradient(90deg, #8a3ffc 65%, #b88cff 100%) !important;
-    color: #fff !important; border-bottom: 2.5px solid #8a3ffc !important;
-    box-shadow: 0 2px 8px rgba(138,63,252,0.08);
-}
-.stTabs [aria-selected="false"]:hover {
-    background: #ede9fe !important; color: #5d27c1 !important;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # ---- Sidebar Settings ----
 with st.sidebar.expander("🛠️ Quality Save Settings", expanded=False):
@@ -167,24 +139,15 @@ def render_polished_card(label, text_content, auto_copy=False):
     """
 
     full_html = f"""
-    <div style="
-        max-width: 100vw; background-color: #1e1e1e; border: 1px solid #333;
-        border-radius: 12px; box-shadow: 0 20px 6px rgba(0,0,0,0.1); padding: 16px; margin: 0;
-        font-family: 'Segoe UI', sans-serif; font-size: 16px; color: #f0f0f0;">
-        <h4 style="margin: 0 0 12px 0;">{label}</h4>
-        <div id="textDisplay-{unique_id}" style="
-            background: #2a2a2a; border-radius: 8px; padding: 12px;
-            white-space: normal; word-wrap: break-word;
-            line-height: 1.6; border: 1px solid #444;
-            overflow-y: auto; height: {fixed_height}px;">
+    <div class="copy-card">
+        <h4>{label}</h4>
+        <div id="textDisplay-{unique_id}" class="text-display" style="height: {fixed_height}px;">
             {html_formatted_text_for_display}
         </div>
-        <button onclick="{copy_button_onclick_js}" style="
-            margin-top: 12px; padding: 6px 12px; background-color: #22c55e;
-            color: white; border: none; border-radius: 6px; font-weight: 500; cursor: pointer;">
+        <button onclick="{copy_button_onclick_js}" class="copy-button-green">
             📋 Copy to Clipboard
         </button>
-        <span id="copyAlert-{unique_id}" style="display: none; margin-left: 10px; color: #22c55e; font-weight: 500;">
+        <span id="copyAlert-{unique_id}" class="copy-alert-green">
             ✅ Copied!
         </span>
         {auto_copy_script}

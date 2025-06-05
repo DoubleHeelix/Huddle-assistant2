@@ -48,10 +48,18 @@ with open("styles.css") as f:
 
 st.markdown(
     """
-    <div class="header-container">
+    <div class="header-container animate-header">
         <h2>🤝 Huddle Assistant</h2>
         <p>Lead confident convos on the go</p>
     </div>
+    <script>
+        const header = document.querySelector('.animate-header');
+        if (header) {
+            header.addEventListener('animationend', () => {
+                header.classList.remove('animate-header');
+            });
+        }
+    </script>
     """,
     unsafe_allow_html=True,
 )

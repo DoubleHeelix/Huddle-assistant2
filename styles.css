@@ -9,6 +9,26 @@
     font-family: 'Segoe UI', sans-serif;
     margin-bottom: 24px;
 }
+
+/* Intro animation for the header */
+.animate-header {
+    animation: header-intro 1.2s ease-out forwards;
+    transform-origin: center top;
+}
+
+@keyframes header-intro {
+    0% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
 .header-container h2 {
     margin: 0;
     font-size: 1.8rem;

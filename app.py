@@ -40,7 +40,7 @@ COLLECTION_NAME = "docs_memory" # For embedding general documents
 HUDDLE_MEMORY_COLLECTION = "huddle_memory" # For past huddles
 VECTOR_SIZE = 1536
 
-st.set_page_config(page_title="Huddle Assistant", layout="centered")
+st.set_page_config(page_title="Huddle Assistant", layout="wide")
 
 # ---- HEADER ----
 with open("styles.css") as f:
@@ -476,10 +476,11 @@ with tab1:
             unsafe_allow_html=True,
         )
         st.session_state.user_draft_current = st.text_area(
-            "Internal draft message label for accessibility", 
+            "Internal draft message label for accessibility",
             value=st.session_state.user_draft_current,
-            label_visibility="collapsed", height=110, 
-            key=st.session_state.user_draft_widget_key 
+            placeholder="Write your message here...",
+            label_visibility="collapsed", height=110,
+            key=st.session_state.user_draft_widget_key
         )
         
         # ---- Action Buttons ----

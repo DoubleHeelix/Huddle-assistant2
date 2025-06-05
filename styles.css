@@ -11,6 +11,7 @@
 }
 .header-container h2 {
     margin: 0;
+    font-size: 1.8rem;
 }
 .header-container p {
     margin: 4px 0 0 0;
@@ -145,6 +146,9 @@ section.main > div {
     padding: 0;
     line-height: 1.5;
 }
+.stTextArea textarea {
+    font-size: 1rem;
+}
 .clear-both { clear: both; }
 .copy-button-green {
     margin-top: 12px;
@@ -161,4 +165,28 @@ section.main > div {
     margin-left: 10px;
     color: #22c55e;
     font-weight: 500;
+}
+
+@media (max-width: 480px) {
+    .header-container {
+        padding: 16px;
+    }
+    .header-container h2 {
+        font-size: 1.5rem;
+    }
+    .header-container p {
+        font-size: 13px;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        padding: 0 3vw !important;
+        overflow-x: auto;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 6px 12px !important;
+        font-size: 0.9rem;
+    }
+    .custom-card {
+        padding: 16px;
+        font-size: 15px;
+    }
 }

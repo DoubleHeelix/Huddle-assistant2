@@ -12,15 +12,22 @@
 
 /* Intro animation for the header */
 .animate-header {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     z-index: 10000;
     animation: header-intro 1.6s ease-out forwards;
-    transform-origin: center top;
+    transform-origin: center center;
 }
 
 @keyframes header-intro {
     0% {
-        transform: scale(15);
+        transform: scale(3);
 
         opacity: 0;
     }

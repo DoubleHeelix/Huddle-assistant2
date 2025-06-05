@@ -218,7 +218,7 @@ with tab1:
             st.session_state.scroll_to_draft = False
         if "last_uploaded_filename" not in st.session_state:
             st.session_state.last_uploaded_filename = None
-        if "current_tone_selection": # Stores selected tone
+        if "current_tone_selection" not in st.session_state:
             st.session_state.current_tone_selection = "None"
 
         # ---- Upload UI ----

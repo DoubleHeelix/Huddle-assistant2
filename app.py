@@ -756,7 +756,7 @@ def generate_conversation_starter(text, image_url=None):
     - **Keep it grounded:** Curiosity should arise from what you actually see or read. (E.g., for a food photo: That looks delicious! Is that avocado toast?)
     - **Be authentic and simple:** Avoid being clever, eccentric, or bubbly. Use real, friendly language.
     - **Use at most one emoji, only if it truly fits.**
-    - **Don't include Quatation marks in your draft.
+    - **Don't include quotation marks in your draft.
     - **Where possible based on your understanding of the uploaded story, include a question at the end to promote a conversation.
     - **Be concise and conversational.**
     

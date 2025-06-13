@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+openai
+requests
+pillow
+python-dotenv
+qdrant-client
+notion-client
+# any additional AI dependencies you use

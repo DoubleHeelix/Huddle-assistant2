@@ -23,10 +23,7 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Expose ports for both processes
-EXPOSE 8501 8000
-
-# Copy supervisor config
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+EXPOSE 8501
 
 # Start both processes
-CMD ["/usr/bin/supervisord"]
+CMD ["python entrypoint.py"]

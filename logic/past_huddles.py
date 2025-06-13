@@ -25,8 +25,7 @@ def past_huddles_tab():
             sorted_huddles_list = [h for h in huddles_data if isinstance(h, dict)]
 
         for idx, huddle_item in enumerate(sorted_huddles_list):
-            timestamp_str = huddle_item.get('timestamp', f"Unknown Timestamp - Item {len(sorted_huddles_list) - idx}")
-            expander_title = f"Huddle {len(sorted_huddles_list) - idx}: {timestamp_str}"
+            expander_title = f"Huddle {len(sorted_huddles_list) - idx}"
             
             with st.expander(expander_title):
                 st.markdown("**🖼 Screenshot Text**")

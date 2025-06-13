@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from huddleplay import huddle_generate_reply
 
-from ocr import extract_text_from_image
+from core_logic.ocr import extract_text_from_image
 
 # Get absolute path to project root .env file
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

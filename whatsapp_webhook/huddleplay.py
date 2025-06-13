@@ -5,7 +5,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os
 from dotenv import load_dotenv
-from suggestor import generate_suggested_reply
+from core_logic.suggestor import generate_suggested_reply
+
 
 
 

@@ -1,5 +1,19 @@
 /* Huddle Assistant styles */
 
+.main .block-container,
+.block-container,
+.stApp,
+body,
+html {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+}
+header,
+.st-emotion-cache-18ni7ap,
+.st-emotion-cache-6qob1r {
+  display: none !important; /* Hides Streamlit header/logo */
+}
+
 .header-container {
   background: linear-gradient(135deg, #8a3ffc, #b88cff);
   padding: 20px;
@@ -283,4 +297,11 @@ button[data-testid="baseButton-primary"]:disabled {
   .st-expander {
     border-radius: 10px !important;
   }
+}
+/* Center expander header text */
+.st-expander .st-expanderHeader {
+  justify-content: center !important;
+  text-align: center !important;
+  display: flex !important;
+  width: 100%;
 }

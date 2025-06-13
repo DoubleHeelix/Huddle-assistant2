@@ -30,7 +30,7 @@ def interruptions_tab(render_polished_card):
         notion = None
         NOTION_DATABASE_ID = None
 
-    def save_human_override(story_text, image_url_provided, ai_message, human_message, analysis_type="unknown"):
+    def save_human_override(story_text, image_url_provided, ai_message, human_message, analysis_type="unknown", prompt_version="unknown"):
         if not notion or not NOTION_DATABASE_ID:
             st.error("Notion client not configured correctly. Cannot save override.")
             return
@@ -45,7 +45,8 @@ def interruptions_tab(render_polished_card):
                 "Image URL": {"rich_text": [{"text": {"content": image_url_for_notion}}]},
                 "AI Message": {"rich_text": [{"text": {"content": str(ai_message) or "N/A"}}]},
                 "Your message": {"rich_text": [{"text": {"content": str(human_message) or "N/A"}}]},
-                "Tone": {"rich_text": [{"text": {"content": str(analysis_type)}}]}
+                "Tone": {"rich_text": [{"text": {"content": str(analysis_type)}}]},
+                "Prompt Version": {"rich_text": [{"text": {"content": prompt_version}}]}
             }
             notion.pages.create(
                 parent={"database_id": NOTION_DATABASE_ID},
@@ -101,7 +102,22 @@ def interruptions_tab(render_polished_card):
             """, height=0)
             st.session_state.scroll_to_story_text = False
 
-        # ----- Inline prompt-based multiple completions -----
+        def get_random_prompt():
+            import random
+            prompt_a = (
+                "You are an observant and thoughtful friend crafting Instagram story replies. "
+                "Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. "
+                "Always reference what's actually there—no guessing or speculation. "
+                "Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally."
+            )
+            prompt_b = (
+                "You are a friendly and engaging buddy replying to Instagram stories. "
+                "Your aim is to spark a fun and lighthearted chat by noticing something specific in the story. "
+                "Be curious and ask a simple question about what you see. "
+                "Keep it casual and use a single emoji to add a bit of personality."
+            )
+            return random.choice([(prompt_a, "A"), (prompt_b, "B")])
+
         def generate_multiple_conversation_starters(text, image_url=None, n=3):
             guidance_line = ""
             if text.strip():
@@ -116,12 +132,10 @@ def interruptions_tab(render_polished_card):
                     guidance_line = "No guidance available."
             else:
                 guidance_line = "No text provided for specific guidance retrieval."
-            system_prompt = (
-                "You are an observant and thoughtful friend crafting Instagram story replies. "
-                "Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. "
-                "Always reference what's actually there—no guessing or speculation. "
-                "Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally."
-            )
+            
+            system_prompt, prompt_version = get_random_prompt()
+            st.session_state.prompt_version = prompt_version
+
             user_prompt_header = "A friend posted an Instagram story."
             story_content_line = (
                 f"Story Content: {text.strip() if text.strip() else 'This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.'}"
@@ -170,19 +184,16 @@ def interruptions_tab(render_polished_card):
             completions = [choice.message.content.strip() for choice in response.choices]
             return completions
 
-        # Defensive: Only display if list (prevents TypeError)
         conversation_starters = st.session_state.get("conversation_starters")
         if conversation_starters is None:
             with st.spinner("🤖 Generating 3 options..."):
                 st.session_state.conversation_starters = generate_multiple_conversation_starters(text, image_url, n=3)
             conversation_starters = st.session_state.conversation_starters
 
-        # Always handle missing or empty conversation starters
         conversation_starters = conversation_starters or []
         for idx, reply in enumerate(conversation_starters):
             render_polished_card(f"Conversation Starter #{idx+1}", reply, auto_copy=True)
 
-        # Editable field to choose and edit any suggestion
         st.markdown("#### ✏️ Your Adjusted Message")
         if "user_edit" not in st.session_state or not st.session_state.get("user_edit"):
             st.session_state.user_edit = conversation_starters[0] if conversation_starters else ""
@@ -192,7 +203,6 @@ def interruptions_tab(render_polished_card):
             height=120
         )
 
-        # Save edited message
         col1_gen, col2_regen = st.columns(2)
         with col1_gen:
             if st.button("✅ Save My Version", use_container_width=True):
@@ -200,9 +210,10 @@ def interruptions_tab(render_polished_card):
                 save_human_override(
                     text,
                     image_url_safe,
-                    "N/A",
                     "\n".join(conversation_starters),
-                    st.session_state.user_edit
+                    st.session_state.user_edit,
+                    "user_edited",
+                    st.session_state.get("prompt_version", "unknown")
                 )
                 st.success("✅ Saved to Notion! Your edits will influence future responses.")
 
@@ -214,7 +225,7 @@ def interruptions_tab(render_polished_card):
                 st.rerun()
 
         if st.button("➕ Start New Interruption", key="new_story_button", use_container_width=True):
-            for key in ["conversation_starters", "last_uploaded_story_name", "scroll_to_story_text", "user_edit"]:
+            for key in ["conversation_starters", "last_uploaded_story_name", "scroll_to_story_text", "user_edit", "prompt_version"]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.session_state.uploader_key_tab2 += 1

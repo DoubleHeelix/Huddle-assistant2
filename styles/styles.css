@@ -162,6 +162,7 @@ section.main > div {
   font-weight: normal;
   padding: 0;
   line-height: 1.5;
+  margin-bottom: 0.25rem !important;
 }
 .stTextArea textarea {
   font-size: 1rem;
@@ -304,4 +305,40 @@ button[data-testid="baseButton-primary"]:disabled {
   text-align: center !important;
   display: flex !important;
   width: 100%;
+}
+
+.feedback-container {
+    background-color: #2a2a2a;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #444;
+}
+
+.feedback-container h5 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #b88cff;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.feedback-container ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.feedback-container li {
+    margin-bottom: 8px;
+    color: #f0f0f0;
+    font-size: 0.95rem;
+}
+
+[data-testid="stImage"] {
+    margin-bottom: 0.5rem !important;
+}
+
+div[data-testid="stTextArea"] {
+    margin-top: 0 !important;
 }

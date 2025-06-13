@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 import os
 from dotenv import load_dotenv
 from whatsapp import send_message, download_media
 
 from huddleplay import huddle_generate_reply
-
 from core_logic.ocr import extract_text_from_image
 
 # Get absolute path to project root .env file
@@ -28,9 +28,9 @@ async def verify(request: Request):
     challenge = params.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return int(challenge)
+        return PlainTextResponse(content=challenge, status_code=200)
     else:
-        return {"status": "invalid token"}, 403
+        return PlainTextResponse(content="Invalid token", status_code=403)
 
 @app.post("/webhook")
 async def webhook_post(request: Request):
@@ -63,14 +63,10 @@ async def webhook_post(request: Request):
                             extracted_text = extract_text_from_image(image_bytes)
                             print(f"📝 OCR Extracted: {extracted_text}")
 
-                            # Combine screenshot text and user draft for the AI
-                            # A more sophisticated approach might involve modifying huddle_generate_reply
-                            # to accept two distinct arguments.
                             combined_input = f"SCREENSHOT CONTEXT:\n{extracted_text}\n\nDRAFT MESSAGE:\n{incoming_text}"
                             reply_text = huddle_generate_reply(user_id, combined_input)
                             
                         else:
-                            # No pending image, process text only
                             print(f"📝 No pending image for {user_id}. Processing text only.")
                             reply_text = huddle_generate_reply(user_id, incoming_text)
 

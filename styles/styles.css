@@ -126,7 +126,7 @@ section.main > div {
 }
 .story-desc {
   font-size: 15px;
-  color: #ccc;
+  color: inherit;
 }
 
 .copy-card {

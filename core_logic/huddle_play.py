@@ -75,6 +75,7 @@ def huddle_play_tab(render_polished_card):
                     st.session_state[key_to_clear] = None
 
             st.session_state.user_draft_current = ""
+            st.rerun()
 
     if st.session_state.scroll_to_draft:
         components.html("""
@@ -90,8 +91,6 @@ def huddle_play_tab(render_polished_card):
         """<p id='draftAnchor' class='draft-message-label'>Your Draft Message</p>""",
         unsafe_allow_html=True,
     )
-    from st_keyup import st_keyup
-    
     def _analyze_draft_for_feedback(draft):
         feedback = []
         
@@ -113,11 +112,12 @@ def huddle_play_tab(render_polished_card):
         
         return feedback
     
-    st.session_state.user_draft_current = st_keyup(
+    st.text_area(
         "Internal draft message label for accessibility",
         placeholder="Write your message here...",
         label_visibility="collapsed",
-        key="user_draft_current_realtime"
+        key="user_draft_current",
+        height=150
     )
 
     if st.session_state.user_draft_current:

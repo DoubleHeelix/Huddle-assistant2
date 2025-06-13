@@ -168,6 +168,42 @@ def get_context_for_reply(screenshot_text, user_draft):
     return huddle_context_str, doc_context_str, doc_matches_for_display
 
 
+#=============whatsapp========================
+def generate_whatsapp_reply(user_text, user_id=None):
+    """
+    Wrapper function for WhatsApp webhook — uses only user message as input.
+    """
+    # Optional: Use user_id to pull per-user Qdrant memory here if you want.
+    # For now, we simplify it.
+    
+    # Build default system principles for WhatsApp messages
+    default_principles = (
+        "1. Focus on curiosity, not persuasion.\n"
+        "2. Keep it natural and personal.\n"
+        "3. Invite dialogue with soft open-ended questions.\n"
+        "4. Avoid sounding like a pitch or sales script.\n"
+        "5. Be warm, human and conversational."
+    )
+    
+    # Since we don't have separate screenshot text or draft, use user_text as both:
+    screenshot_text = user_text
+    user_draft = user_text
+    
+    # Context can be empty for now or you can retrieve Qdrant as next upgrade
+    huddle_context_str = "No prior huddles found."
+    doc_context_str = "No relevant docs found."
+    
+    reply = generate_suggested_reply(
+        screenshot_text,
+        user_draft,
+        default_principles,
+        model_name=None,
+        huddle_context_str=huddle_context_str,
+        doc_context_str=doc_context_str
+    )
+    return reply
+
+
 # ====== NON-STREAMING SUGGESTION (MODIFIED FOR REGENERATION) ======
 def generate_suggested_reply(screenshot_text, user_draft, principles, model_name, 
                              huddle_context_str, doc_context_str,

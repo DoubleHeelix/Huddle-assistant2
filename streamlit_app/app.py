@@ -1,8 +1,14 @@
 import streamlit as st
+import sys
+import os
+
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from components.card import render_polished_card
-from logic.huddle_play import huddle_play_tab
-from logic.interruptions import interruptions_tab
-from logic.past_huddles import past_huddles_tab
+from core_logic.huddle_play import huddle_play_tab
+from core_logic.interruptions import interruptions_tab
+from core_logic.past_huddles import past_huddles_tab
 from utils.state import init_session_state
 
 def load_css(file_name):

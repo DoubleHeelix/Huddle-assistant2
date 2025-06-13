@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     tesseract-ocr \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
@@ -21,9 +22,11 @@ COPY . /app
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Streamlit default port
-EXPOSE 8501
+# Expose ports for both processes
+EXPOSE 8501 8000
 
-# Run memory sync in background (optional) and launch app
-CMD ["python", "entrypoint.py"]
+# Copy supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Start both processes
+CMD ["/usr/bin/supervisord"]

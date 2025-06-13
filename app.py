@@ -25,14 +25,6 @@ else:
     # Override any gradient background left from landing page
     with open("styles/styles.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    st.markdown("""
-    <style>
-    .stApp { 
-        background: #181823 !important; 
-        min-height: 100vh;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     # Header
     st.markdown(

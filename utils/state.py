@@ -19,7 +19,6 @@ def init_session_state():
         "doc_context_for_regen": None,
         "principles_for_regen": None,
         "uploader_key": 0,
-        # Tab 2
         "uploader_key_tab2": 0,
         "conversation_starters": None,
         "last_uploaded_story_name": None,

@@ -5,6 +5,10 @@ from logic.interruptions import interruptions_tab
 from logic.past_huddles import past_huddles_tab
 from utils.state import init_session_state
 
+def load_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 from dotenv import load_dotenv
 import os
 
@@ -122,8 +126,7 @@ else:
     # --- Main App ONLY ---
 
     # Override any gradient background left from landing page
-    with open("styles/styles.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    load_css("styles/styles.css")
 
     # Header
     st.markdown(

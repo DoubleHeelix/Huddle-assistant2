@@ -3,6 +3,27 @@
 import streamlit as st
 from memory import load_all_interactions
 
+def get_category(huddle):
+    text = (huddle.get('screenshot_text', '') + ' ' + 
+            huddle.get('user_draft', '') + ' ' + 
+            huddle.get('ai_suggested', '')).lower()
+
+    if any(keyword in text for keyword in ["what's the business", "what is it", "what do you do", "side hustle", "what is this"]):
+        return "💼 What's the business?"
+    if any(keyword in text for keyword in ["property", "shares", "trading", "dropshipping", "like...?"]):
+        return "🤔 Is it like...?"
+    if any(keyword in text for keyword in ["make money", "how much", "charge", "income", "revenue", "profit"]):
+        return "💰 How do you make money?"
+    if any(keyword in text for keyword in ["mentor", "mentors", "mentorship", "coach", "coaching"]):
+        return "👥 Who are your mentors?"
+    if any(keyword in text for keyword in ["get connected", "get involved", "how did you get in", "how do i join", "selection process"]):
+        return "🤝 How do I get involved?"
+    if any(keyword in text for keyword in ["pyramid scheme", "ponzi"]):
+        return "⚠️ Is it a pyramid scheme?"
+    if any(keyword in text for keyword in ["skincare", "energy drinks", "makeup", "products", "selling", "sell"]):
+        return "💄 Product-related questions"
+    return "💬 General"
+
 def past_huddles_tab():
     st.subheader("📖 Past Huddle Interactions")
     try:
@@ -51,20 +72,37 @@ def past_huddles_tab():
 
         st.markdown(f"**Displaying {len(filtered_huddles)} of {len(sorted_huddles_list)} huddles.**")
 
-        for idx, huddle_item in enumerate(filtered_huddles):
-            expander_title = f"Huddle {len(sorted_huddles_list) - sorted_huddles_list.index(huddle_item)}"
-            
-            with st.expander(expander_title):
-                st.markdown("**🖼 Screenshot Text**")
-                st.write(huddle_item.get('screenshot_text', '_Not available_'))
-                st.markdown("**📝 User Draft**")
-                st.write(huddle_item.get('user_draft', '_Not available_'))
-                st.markdown("**🤖 AI Suggested Reply (Original)**")
-                st.write(huddle_item.get('ai_suggested', '_Not available_'))
+        categorized_huddles = {
+            "💼 What's the business?": [],
+            "🤔 Is it like...?": [],
+            "💰 How do you make money?": [],
+            "👥 Who are your mentors?": [],
+            "🤝 How do I get involved?": [],
+            "⚠️ Is it a pyramid scheme?": [],
+            "💄 Product-related questions": [],
+            "💬 General": []
+        }
 
-                if huddle_item.get('ai_adjusted_reply'):
-                    st.markdown("**🗣️ Tone Adjusted Reply**")
-                    st.write(huddle_item.get('ai_adjusted_reply'))
-                elif huddle_item.get('user_final'):
-                    st.markdown("**🧠 User's Final Version (if different from AI)**")
-                    st.write(huddle_item.get('user_final'))
+        for huddle in filtered_huddles:
+            category = get_category(huddle)
+            categorized_huddles[category].append(huddle)
+
+        for category, huddles in categorized_huddles.items():
+            if huddles:
+                with st.expander(f"{category} ({len(huddles)})"):
+                    for huddle_item in huddles:
+                        with st.container(border=True):
+                            st.markdown(f"**Huddle {len(sorted_huddles_list) - sorted_huddles_list.index(huddle_item)}**")
+                            st.markdown("**🖼 Screenshot Text**")
+                            st.write(huddle_item.get('screenshot_text', '_Not available_'))
+                            st.markdown("**📝 User Draft**")
+                            st.write(huddle_item.get('user_draft', '_Not available_'))
+                            st.markdown("**🤖 AI Suggested Reply (Original)**")
+                            st.write(huddle_item.get('ai_suggested', '_Not available_'))
+
+                            if huddle_item.get('ai_adjusted_reply'):
+                                st.markdown("**🗣️ Tone Adjusted Reply**")
+                                st.write(huddle_item.get('ai_adjusted_reply'))
+                            elif huddle_item.get('user_final'):
+                                st.markdown("**🧠 User's Final Version (if different from AI)**")
+                                st.write(huddle_item.get('user_final'))

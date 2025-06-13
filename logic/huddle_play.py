@@ -91,7 +91,7 @@ def huddle_play_tab(render_polished_card):
         unsafe_allow_html=True,
     )
     from st_keyup import st_keyup
-
+    
     def _analyze_draft_for_feedback(draft):
         feedback = []
         
@@ -106,13 +106,13 @@ def huddle_play_tab(render_polished_card):
         # Principle 4: Concise & Authentic (check for length)
         if len(draft.split()) > 50:
             feedback.append("This seems a bit long. Can you make it more concise?")
-
+    
         # Principle 5: Strategic Next Step (check for call to action)
         if not any(word in draft.lower() for word in ["you", "your", "their"]):
             feedback.append("Make it about them. Try using words like 'you' or 'your' to build rapport.")
         
         return feedback
-
+    
     st.session_state.user_draft_current = st_keyup(
         "Internal draft message label for accessibility",
         placeholder="Write your message here...",

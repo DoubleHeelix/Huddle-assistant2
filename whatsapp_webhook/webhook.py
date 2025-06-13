@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Request
 import os
 from dotenv import load_dotenv
-from whatsapp_webhook.whatsapp import send_message, download_media
+from whatsapp import send_message, download_media
 
-from whatsapp_webhook.huddleplay import huddle_generate_reply
+from huddleplay import huddle_generate_reply
 
 from core_logic.ocr import extract_text_from_image
 

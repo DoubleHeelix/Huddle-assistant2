@@ -6,7 +6,8 @@ from whatsapp import send_message, download_media
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from whatsapp_webhook.huddleplay import huddle_generate_reply
+from huddleplay import huddle_generate_reply
+
 from ocr import extract_text_from_image
 
 # Get absolute path to project root .env file

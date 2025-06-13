@@ -11,7 +11,6 @@ def init_session_state():
         "screenshot_text_content": None,
         "user_draft_current": "",
         "similar_examples_retrieved": None,
-        "user_draft_widget_key": "user_draft_initial",
         "current_tone_selection": "None",
         "last_uploaded_filename": None,
         "scroll_to_draft": False,
@@ -26,6 +25,7 @@ def init_session_state():
         "last_uploaded_story_name": None,
         "scroll_to_story_text": False,
         "user_edit": "",
+        "draft_feedback": [],
     }
     for key, default in defaults.items():
         if key not in st.session_state:

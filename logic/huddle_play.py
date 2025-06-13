@@ -75,7 +75,6 @@ def huddle_play_tab(render_polished_card):
                     st.session_state[key_to_clear] = None
 
             st.session_state.user_draft_current = ""
-            st.session_state.user_draft_widget_key = f"user_draft_new_img_{uuid.uuid4().hex[:6]}"
 
     if st.session_state.scroll_to_draft:
         components.html("""
@@ -87,19 +86,56 @@ def huddle_play_tab(render_polished_card):
             </script>
         """, height=0)
         st.session_state.scroll_to_draft = False
-    st.markdown("<div id='draftAnchor'></div>", unsafe_allow_html=True)
-
     st.markdown(
-        """<p class='draft-message-label'>Your Draft Message</p>""",
+        """<p id='draftAnchor' class='draft-message-label'>Your Draft Message</p>""",
         unsafe_allow_html=True,
     )
-    st.session_state.user_draft_current = st.text_area(
+    from st_keyup import st_keyup
+
+    def _analyze_draft_for_feedback(draft):
+        feedback = []
+        
+        # Principle 1: Clarity & Impact (check for length)
+        if len(draft) < 15:
+            feedback.append("Consider adding more detail for clarity and impact.")
+        
+        # Principle 2: Curiosity, Not Persuasion (check for question mark)
+        if "?" not in draft:
+            feedback.append("Try adding a question to invite dialogue and show curiosity.")
+            
+        # Principle 4: Concise & Authentic (check for length)
+        if len(draft.split()) > 50:
+            feedback.append("This seems a bit long. Can you make it more concise?")
+
+        # Principle 5: Strategic Next Step (check for call to action)
+        if not any(word in draft.lower() for word in ["you", "your", "their"]):
+            feedback.append("Make it about them. Try using words like 'you' or 'your' to build rapport.")
+        
+        return feedback
+
+    st.session_state.user_draft_current = st_keyup(
         "Internal draft message label for accessibility",
-        value=st.session_state.user_draft_current,
         placeholder="Write your message here...",
-        label_visibility="collapsed", height=110,
-        key=st.session_state.user_draft_widget_key
+        label_visibility="collapsed",
+        key="user_draft_current_realtime"
     )
+
+    if st.session_state.user_draft_current:
+        feedback = _analyze_draft_for_feedback(st.session_state.user_draft_current)
+        if feedback:
+            feedback_html = "<ul>"
+            for item in feedback:
+                feedback_html += f"<li>{item}</li>"
+            feedback_html += "</ul>"
+        else:
+            feedback_html = "<ul><li>✅ Your draft looks great!</li></ul>"
+
+        st.markdown(f"""
+        <div class="feedback-container">
+            <h5>💡 Real-time Feedback</h5>
+            {feedback_html}
+        </div>
+        """, unsafe_allow_html=True)
 
     # --- Action Buttons ---
     col1_gen, col2_regen = st.columns(2)
@@ -258,7 +294,6 @@ def huddle_play_tab(render_polished_card):
             "screenshot_text_content": None,
             "user_draft_current": "",
             "similar_examples_retrieved": None,
-            "user_draft_widget_key": "user_draft_initial",
             "current_tone_selection": "None",
             "last_uploaded_filename": None,
             "scroll_to_draft": False,
@@ -272,7 +307,6 @@ def huddle_play_tab(render_polished_card):
                 st.session_state[k_clear] = session_keys_defaults[k_clear]
         st.session_state.uploader_key += 1
         st.session_state.user_draft_current = ""
-        st.session_state.user_draft_widget_key = f"user_draft_{uuid.uuid4().hex[:6]}"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -395,4 +429,5 @@ def _handle_ai_generation_and_save(current_uploaded_image, render_polished_card,
         st.warning("⚠️ This huddle wasn't saved:")
         for reason in failure_reasons:
             st.markdown(f"• {reason}")
+
 

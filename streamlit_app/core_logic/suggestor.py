@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI # Updated import
 from qdrant_client import QdrantClient
 # Assuming vectorizer.py contains embed_single
-from vectorizer import embed_single # Make sure this import is correct and vectorizer.py is in your project path
+from .vectorizer import embed_single # Make sure this import is correct and vectorizer.py is in your project path
 import google.generativeai as genai
 
 load_dotenv()

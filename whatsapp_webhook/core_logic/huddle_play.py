@@ -7,12 +7,12 @@ import uuid
 import time
 import streamlit.components.v1 as components
 
-from memory import save_huddle_to_notion
-from memory_vector import embed_and_store_interaction, retrieve_similar_examples
-from suggestor import get_context_for_reply, generate_suggested_reply, generate_adjusted_tone
-from ocr import extract_text_from_image
-from doc_embedder import embed_documents_parallel
-from notion_embedder import embed_huddles_qdrant
+from .memory import save_huddle_to_notion
+from .memory_vector import embed_and_store_interaction, retrieve_similar_examples
+from .suggestor import get_context_for_reply, generate_suggested_reply, generate_adjusted_tone
+from .ocr import extract_text_from_image
+from .doc_embedder import embed_documents_parallel
+from .notion_embedder import embed_huddles_qdrant
 from qdrant_client import QdrantClient
 
 PDF_DIR = "public"

@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  streamlit:
+    build:
+      context: .
+      dockerfile: streamlit_app/Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./streamlit_app:/app
+      - ./core_logic:/app/core_logic
+  whatsapp:
+    build:
+      context: .
+      dockerfile: whatsapp_webhook/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./whatsapp_webhook:/app
+      - ./core_logic:/app/core_logic

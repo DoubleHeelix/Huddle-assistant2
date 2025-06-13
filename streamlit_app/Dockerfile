@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY streamlit_app/ /app/
+COPY . /app/
 COPY core_logic/ /app/core_logic/
 
 RUN pip install --upgrade pip

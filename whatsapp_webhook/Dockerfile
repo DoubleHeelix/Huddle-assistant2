@@ -11,12 +11,12 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /app
-COPY ../core_logic /app/core_logic
+COPY whatsapp_webhook/ /app/
+COPY core_logic/ /app/core_logic/
 
 RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install -r /app/requirements.txt
 
 EXPOSE 8000
 
-CMD ["uvicorn", "webhook:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "whatsapp_webhook.webhook:app", "--host", "0.0.0.0", "--port", "8000"]
